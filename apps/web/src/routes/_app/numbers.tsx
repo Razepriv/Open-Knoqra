@@ -5,6 +5,7 @@ import { NumberList } from '../../components/numbers/number-list';
 import { NumbersPageSkeleton } from '../../components/numbers/numbers-page-skeleton';
 import { SetupChecks } from '../../components/numbers/setup-checks';
 import { BlockError } from '../../components/usage/usage-states';
+import { deskSlot } from '../../extensions';
 import { useMe } from '../../lib/api';
 import { canBuyNumbers } from '../../lib/number-purchase';
 import { useNumbers } from '../../lib/numbers';
@@ -78,6 +79,7 @@ function NumbersPage() {
   if (!setup.data || !numbers.data || !me.data) return <NumbersPageSkeleton />;
 
   const canManage = MANAGER_ROLES.has(me.data.organization.role);
+  const NumbersPanel = deskSlot('NumbersPanel');
   const connected = setup.data.checks.find((check) => check.id === 'credential')?.status === 'pass';
   return (
     <div className="flex flex-col gap-4">
@@ -90,6 +92,7 @@ function NumbersPage() {
         connected={connected}
         canBuy={canBuyNumbers(me.data.organization.role)}
       />
+      {NumbersPanel ? <NumbersPanel canManage={canManage} /> : null}
     </div>
   );
 }

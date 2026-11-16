@@ -1,5 +1,6 @@
 import { shellLayout } from '@knoqra/ui';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { deskSlot } from '../../extensions';
 import { isPaletteShortcut, useGlobalShortcut } from '../../lib/use-global-shortcut';
 import { useMediaQuery, WIDE_QUERY } from '../../lib/use-media-query';
 import { OfflineBanner } from '../states/offline-banner';
@@ -37,6 +38,7 @@ export function AppShell({ user, children }: AppShellProps) {
   const registry = useMemo(() => ({ target, register: setRibbonLabel }), [target]);
   const inlineLabel = wide ? ribbonLabel : null;
   const drawerLabel = wide ? null : ribbonLabel;
+  const ShellBanner = deskSlot('ShellBanner');
 
   return (
     <RibbonContext.Provider value={registry}>
@@ -55,6 +57,7 @@ export function AppShell({ user, children }: AppShellProps) {
             contextButtonRef={contextButton}
           />
           <OfflineBanner />
+          {ShellBanner ? <ShellBanner /> : null}
           <div
             className={`${shellLayout.content} ${
               inlineLabel ? shellLayout.withRibbon : shellLayout.oneColumn

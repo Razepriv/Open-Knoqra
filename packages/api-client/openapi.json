@@ -265,9 +265,19 @@
           },
           "analyticsConsent": {
             "type": "boolean"
+          },
+          "newsletter": {
+            "type": "boolean"
           }
         },
-        "required": ["timezone", "theme", "notifyEmail", "notifyDesktop", "analyticsConsent"]
+        "required": [
+          "timezone",
+          "theme",
+          "notifyEmail",
+          "notifyDesktop",
+          "analyticsConsent",
+          "newsletter"
+        ]
       },
       "UpdateProfile": {
         "type": "object",
@@ -364,6 +374,9 @@
             "type": "boolean"
           },
           "analyticsConsent": {
+            "type": "boolean"
+          },
+          "newsletter": {
             "type": "boolean"
           }
         }
@@ -8625,7 +8638,7 @@
             }
           },
           "403": {
-            "description": "Only owners and admins can add credit",
+            "description": "Only owners and admins can add credit; on KNOQRA Cloud credit comes from payments",
             "content": {
               "application/json": {
                 "schema": {

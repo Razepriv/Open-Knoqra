@@ -828,3 +828,50 @@ describe('TelnyxProvider number purchase', () => {
     ).rejects.toMatchObject({ status: 422, code: 'unknown' });
   });
 });
+
+describe('releasing a number', () => {
+  const url = `${BASE}/phone_numbers/1293384261075731499`;
+
+  it('deletes the number and reports it released', async () => {
+    const { calls, fetchImpl } = stubFetch([
+      {
+        method: 'DELETE',
+        url,
+        respond: json(200, { data: { id: '1293384261075731499', status: 'deleted' } }),
+      },
+    ]);
+    await expect(provider(fetchImpl).releaseNumber('1293384261075731499')).resolves.toBe(
+      'released',
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.headers.get('authorization')).toBe(`Bearer ${API_KEY}`);
+  });
+
+  it('reads a 404 as a number Telnyx no longer has, not as an error', async () => {
+    const { fetchImpl } = stubFetch([
+      { method: 'DELETE', url, respond: json(404, { errors: [{ code: '10005' }] }) },
+    ]);
+    await expect(provider(fetchImpl).releaseNumber('1293384261075731499')).resolves.toBe(
+      'not_found',
+    );
+  });
+
+  it('throws the status and code of any other refusal', async () => {
+    const { fetchImpl } = stubFetch([
+      { method: 'DELETE', url, respond: json(422, { errors: [{ code: '10015' }] }) },
+    ]);
+    const error = await provider(fetchImpl)
+      .releaseNumber('1293384261075731499')
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TelnyxApiError);
+    expect(error).toMatchObject({ status: 422, code: '10015' });
+  });
+
+  it('refuses an id that is not a Telnyx id without calling Telnyx', async () => {
+    const { calls, fetchImpl } = stubFetch([]);
+    await expect(provider(fetchImpl).releaseNumber('../balance')).rejects.toBeInstanceOf(
+      TelnyxApiError,
+    );
+    expect(calls).toHaveLength(0);
+  });
+});

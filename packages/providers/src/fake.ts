@@ -21,6 +21,8 @@ import type {
   MessagingProvider,
   NumberOrderResult,
   NumberPurchaseProvider,
+  NumberReleaseProvider,
+  NumberReleaseResult,
   NumberSearch,
   NumbersProvider,
   ParseOutcome,
@@ -189,6 +191,7 @@ export class FakeProvider
     MessagingProvider,
     NumbersProvider,
     NumberPurchaseProvider,
+    NumberReleaseProvider,
     BalanceProvider,
     WebhookAdapter,
     EventNormalizer
@@ -251,6 +254,11 @@ export class FakeProvider
       status: listed && !input.e164.endsWith(FAKE_FAILING_SUFFIX) ? 'completed' : 'failed',
       e164: input.e164,
     };
+  }
+
+  /** The fake has nothing to give back: every release succeeds. */
+  async releaseNumber(_providerNumberId: string): Promise<NumberReleaseResult> {
+    return 'released';
   }
 
   async createClientSession(_input: SessionInput): Promise<ShortLivedVoiceCredential> {

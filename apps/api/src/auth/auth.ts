@@ -3,12 +3,16 @@ import type { Database } from '@knoqra/db';
 import * as schema from '@knoqra/db/schema';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { organization, twoFactor } from 'better-auth/plugins';
+import { announceNewsletterChange, saveNewsletterChoice } from '../email/newsletter';
+import { passwordResetEmail } from '../email/templates';
+import { emailContext, sendWelcomeEmail, welcomeFacts } from '../email/welcome';
 import type { Env } from '../env';
 import { type EmailSender, emailSenderFor } from '../lib/email';
+import { logger } from '../lib/logger';
 import { safeText } from '../lib/schemas';
-import { ensurePersonalWorkspace, initialOrganizationId } from './workspace';
+import { ensurePersonalWorkspace, firstMembershipOrgId, initialOrganizationId } from './workspace';
 
 /**
  * Organization-plugin endpoints that stay reachable: the Desk reads and switches the user's own
@@ -197,11 +201,8 @@ export function createAuth(env: Env, db: Database, deps: AuthDeps = {}) {
       // A reset usually follows a lost or stolen password: sign out every other session with it.
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
-        await email.send(
-          user.email,
-          'Reset your KNOQRA password',
-          `Someone asked to reset the password for this account. To choose a new one, open:\n\n${url}\n\nIf it was not you, ignore this email.`,
-        );
+        const message = passwordResetEmail(emailContext(env), { email: user.email, url });
+        await email.send({ to: user.email, ...message });
       },
     },
     plugins: [
@@ -241,6 +242,42 @@ export function createAuth(env: Env, db: Database, deps: AuthDeps = {}) {
           },
         },
       },
+    },
+    hooks: {
+      // After a successful sign-up: record the newsletter choice from the form (an extra body
+      // field Better Auth ignores) and send the welcome email. The database reads happen now,
+      // before the response closes the request's connection; the mail goes out in the background.
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-up/email') return;
+        const created = ctx.context.newSession;
+        if (!created) return;
+        const { user } = created;
+        const newsletter = (ctx.body as { newsletter?: unknown } | undefined)?.newsletter === true;
+        const background = deps.waitUntil ?? ((promise: Promise<unknown>) => void promise);
+        try {
+          if (newsletter) {
+            await saveNewsletterChoice(db, user.id, true);
+            background(
+              announceNewsletterChange(env, {
+                userId: user.id,
+                email: user.email,
+                name: user.name,
+                subscribed: true,
+                source: 'sign-up',
+              }),
+            );
+          }
+          const organizationId = await firstMembershipOrgId(db, user.id);
+          if (!organizationId) return;
+          const facts = await welcomeFacts(env, db, organizationId);
+          background(sendWelcomeEmail(env, email, user, facts, newsletter));
+        } catch (error) {
+          // Sign-up already succeeded: a missing welcome email must not turn it into an error.
+          logger.error('email.welcome_prepare_failed', {
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+        }
+      }),
     },
     // In-memory limiter: per isolate only. Off in dev and test so suites can sign up freely. Kept
     // as defence in depth: the durable limit is the RL_AUTH Rate Limiting binding (lib/rate-limit.ts).

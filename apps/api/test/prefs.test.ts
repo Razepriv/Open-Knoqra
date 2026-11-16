@@ -9,6 +9,7 @@ type Prefs = {
   notifyEmail: boolean;
   notifyDesktop: boolean;
   analyticsConsent: boolean;
+  newsletter: boolean;
 };
 type Envelope<T> = { data: T | null; error: { code: string; message: string } | null };
 type MeBody = Envelope<{ user: { id: string; name: string }; prefs: Prefs }>;
@@ -19,6 +20,7 @@ const DEFAULTS: Prefs = {
   notifyEmail: true,
   notifyDesktop: true,
   analyticsConsent: false,
+  newsletter: false,
 };
 
 function patch(path: string, cookie: string, body: unknown): Promise<Response> {
@@ -72,6 +74,7 @@ describe('GET/PATCH /api/v1/me/prefs', () => {
       notifyEmail: false,
       notifyDesktop: true,
       analyticsConsent: false,
+      newsletter: false,
     });
     expect((await meOf(cookie))?.prefs.theme).toBe('dark');
   });

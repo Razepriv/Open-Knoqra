@@ -17,6 +17,8 @@ export const Prefs = z
     notifyEmail: z.boolean(),
     notifyDesktop: z.boolean(),
     analyticsConsent: z.boolean(),
+    /** Product news and new blog posts by email. Off until the user opts in. */
+    newsletter: z.boolean(),
   })
   .openapi('Prefs');
 export type PrefsJson = z.infer<typeof Prefs>;
@@ -29,6 +31,7 @@ export const UpdatePrefs = z
     notifyEmail: z.boolean().optional(),
     notifyDesktop: z.boolean().optional(),
     analyticsConsent: z.boolean().optional(),
+    newsletter: z.boolean().optional(),
   })
   .openapi('UpdatePrefs');
 export type UpdatePrefsInput = z.infer<typeof UpdatePrefs>;
@@ -39,6 +42,7 @@ export const DEFAULT_PREFS: PrefsJson = {
   notifyEmail: true,
   notifyDesktop: true,
   analyticsConsent: false,
+  newsletter: false,
 };
 
 /** The user's preferences, or the defaults when they have never saved any. */
@@ -51,5 +55,6 @@ export async function loadPrefs(db: Database | Tx, userId: string): Promise<Pref
     notifyEmail: row.notifyEmail,
     notifyDesktop: row.notifyDesktop,
     analyticsConsent: row.analyticsConsent,
+    newsletter: row.newsletter,
   };
 }

@@ -18,6 +18,18 @@ export interface Env {
   RESEND_API_KEY?: string;
   /** Sender address for outgoing mail, for example `KNOQRA <no-reply@example.com>`. */
   EMAIL_FROM?: string;
+  /** Optional reply-to address for outgoing mail, for example a support inbox. */
+  EMAIL_REPLY_TO?: string;
+  /**
+   * The sender's postal address, one line, shown in every email footer. Marketing mail (the
+   * newsletter) is not sent without it (CAN-SPAM).
+   */
+  EMAIL_POSTAL_ADDRESS?: string;
+  /**
+   * Optional RSS 2.0 feed whose three newest posts appear in the welcome email, for example
+   * `https://example.com/rss.xml`. Unset: no blog section.
+   */
+  BLOG_FEED_URL?: string;
   /**
    * Otto's model (otto/provider.ts): unset or `mock` is the deterministic mock, `openai` an
    * OpenAI-compatible API with AI_API_KEY, `chatgpt` each user's ChatGPT sign-in (not built yet:

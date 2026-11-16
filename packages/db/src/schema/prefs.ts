@@ -20,6 +20,10 @@ export const userPrefs = pgTable(
     notifyEmail: boolean('notify_email').notNull().default(true),
     notifyDesktop: boolean('notify_desktop').notNull().default(true),
     analyticsConsent: boolean('analytics_consent').notNull().default(false),
+    /** Opted in to product news and new blog posts by email. Off until the user turns it on. */
+    newsletter: boolean('newsletter').notNull().default(false),
+    /** When the newsletter choice was last made (opt-in or opt-out), for consent records. */
+    newsletterUpdatedAt: timestamp('newsletter_updated_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()

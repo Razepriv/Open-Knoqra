@@ -118,6 +118,22 @@ export interface NumberPurchaseProvider {
   orderNumber(input: { e164: string; connectionId: string | null }): Promise<NumberOrderResult>;
 }
 
+/** What a release did: `released` now, or `not_found` (the provider no longer has the number). */
+export type NumberReleaseResult = 'released' | 'not_found';
+
+/**
+ * Gives a number back to the provider, which stops its monthly charge. Not every provider
+ * implements it: check with `canReleaseNumbers`. Other errors throw a `ProviderApiError`.
+ */
+export interface NumberReleaseProvider {
+  releaseNumber(providerNumberId: string): Promise<NumberReleaseResult>;
+}
+
+/** Whether this provider can release numbers. */
+export function canReleaseNumbers(provider: object): provider is NumberReleaseProvider {
+  return typeof (provider as Partial<NumberReleaseProvider>).releaseNumber === 'function';
+}
+
 export interface ProviderBalance {
   balanceMicros: number;
   currency: 'USD';

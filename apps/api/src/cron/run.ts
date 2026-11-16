@@ -65,16 +65,22 @@ async function runRecorded(
   throw failure.error;
 }
 
+/** The core's jobs, then those of the extensions the Worker was built with. */
+export function cronJobsOf(env: Pick<Env, 'EXTENSIONS'>): readonly CronJob[] {
+  const extra = (env.EXTENSIONS ?? []).flatMap((extension) => extension.cronJobs ?? []);
+  return extra.length === 0 ? CRON_JOBS : [...CRON_JOBS, ...extra];
+}
+
 /**
- * The Worker's `scheduled` handler. Finds the job for the trigger's cron expression and records
- * each run in `cron_run` for the health check. A failure is logged, reported and rethrown, so
- * Cloudflare (and Sentry's cron monitor) mark the invocation failed.
+ * The Worker's `scheduled` handler. Finds the job for the trigger's cron expression (core or
+ * extension) and records each run in `cron_run` for the health check. A failure is logged,
+ * reported and rethrown, so Cloudflare (and Sentry's cron monitor) mark the invocation failed.
  */
 export async function handleScheduled(
   controller: ScheduledController,
   env: Env,
   ctx: ExecutionContext,
-  jobs: readonly CronJob[] = CRON_JOBS,
+  jobs: readonly CronJob[] = cronJobsOf(env),
 ): Promise<void> {
   configureLogging({ appEnv: env.APP_ENV });
   const job = jobs.find((candidate) => candidate.cron === controller.cron);

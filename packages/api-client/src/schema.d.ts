@@ -4540,7 +4540,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Only owners and admins can add credit */
+                /** @description Only owners and admins can add credit; on KNOQRA Cloud credit comes from payments */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -6853,6 +6853,7 @@ export interface components {
             notifyEmail: boolean;
             notifyDesktop: boolean;
             analyticsConsent: boolean;
+            newsletter: boolean;
         };
         UpdateProfile: {
             name: string;
@@ -6885,6 +6886,7 @@ export interface components {
             notifyEmail?: boolean;
             notifyDesktop?: boolean;
             analyticsConsent?: boolean;
+            newsletter?: boolean;
         };
         ImportResult: {
             results: {

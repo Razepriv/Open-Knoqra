@@ -16,11 +16,11 @@ const LINK = 'https://x/reset?token=SECRET';
 describe('resendEmailSender', () => {
   it('posts to Resend with a bearer key', async () => {
     const f = vi.fn(async () => new Response('{"id":"1"}', { status: 200 }));
-    await resendEmailSender({ apiKey: 'k', from: 'a@b.test', fetch: f }).send(
-      'u@x.test',
-      'Hi',
-      'body',
-    );
+    await resendEmailSender({ apiKey: 'k', from: 'a@b.test', fetch: f }).send({
+      to: 'u@x.test',
+      subject: 'Hi',
+      text: 'body',
+    });
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://api.resend.com/emails');
     expect(init.method).toBe('POST');
@@ -33,10 +33,38 @@ describe('resendEmailSender', () => {
     });
   });
 
+  it('sends the HTML version, reply-to and extra headers when given', async () => {
+    const f = vi.fn(async () => new Response('{"id":"1"}', { status: 200 }));
+    await resendEmailSender({
+      apiKey: 'k',
+      from: 'a@b.test',
+      replyTo: 'help@b.test',
+      fetch: f,
+    }).send({
+      to: 'u@x.test',
+      subject: 'Hi',
+      text: 'body',
+      html: '<p>body</p>',
+      headers: { 'List-Unsubscribe': '<https://x.test/u>' },
+    });
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      from: 'a@b.test',
+      to: ['u@x.test'],
+      subject: 'Hi',
+      text: 'body',
+      html: '<p>body</p>',
+      reply_to: 'help@b.test',
+      headers: { 'List-Unsubscribe': '<https://x.test/u>' },
+    });
+  });
+
   it('never leaks the body or link on failure', async () => {
     const f = vi.fn(async () => new Response(`boom: ${LINK}`, { status: 500 }));
     const sender = resendEmailSender({ apiKey: 'k', from: 'a@b.test', fetch: f });
-    const error = await sender.send('u@x.test', 'Reset', LINK).catch((e: unknown) => e);
+    const error = await sender
+      .send({ to: 'u@x.test', subject: 'Reset', text: LINK, html: `<a href="${LINK}">x</a>` })
+      .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe('Resend request failed with status 500');
     expect((error as Error).message).not.toMatch(/SECRET/);

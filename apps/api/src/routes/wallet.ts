@@ -11,6 +11,7 @@ import { callBillingOf } from '../lib/pricing';
 import { publish } from '../lib/realtime';
 import { safeText } from '../lib/schemas';
 import { grantsStarterCredit, loadVoiceChoice } from '../lib/voice-provider';
+import { editionOf } from '../license/edition';
 import {
   credit,
   ensureWallet,
@@ -145,7 +146,9 @@ const creditRoute = createRoute({
     201: { description: 'Recorded credit', content: json(okEnvelope(CreditResultSchema)) },
     400: errorResponse('Invalid body'),
     401: errorResponse('No valid session'),
-    403: errorResponse('Only owners and admins can add credit'),
+    403: errorResponse(
+      'Only owners and admins can add credit; on KNOQRA Cloud credit comes from payments',
+    ),
     409: errorResponse(
       'The idempotency key was used for a different entry, or no active organization',
     ),
@@ -185,6 +188,17 @@ function toLedgerJson(row: LedgerEntryRow): LedgerEntryJson {
   };
 }
 
+/**
+ * Whether owners may record credit by hand (`POST /api/v1/wallet/credits`). A self-hosted instance
+ * records its own provider spend this way. On KNOQRA Cloud the numbers and minutes are bought on
+ * KNOQRA's account, so in staging and production credit comes only from verified payments; local
+ * development and tests keep the route.
+ */
+export function manualCreditAllowed(env: Pick<Env, 'KNOQRA_EDITION' | 'APP_ENV'>): boolean {
+  if (editionOf(env) !== 'cloud') return true;
+  return env.APP_ENV === 'development' || env.APP_ENV === 'test';
+}
+
 /** Creates the wallet on first use (with the development starter credit when it applies). */
 export async function openWallet(tx: Tx, env: Env, orgId: string) {
   const choice = await loadVoiceChoice(tx, env);
@@ -204,11 +218,12 @@ function forbidden(
   tenant: Tenant,
   action: 'wallet.caps.update' | 'wallet.credit.create',
   message: string,
+  reason: 'role' | 'edition' = 'role',
 ) {
   return auditCallAlone(db, tenant, {
     action,
     outcome: 'denied',
-    metadata: { reason: 'role' },
+    metadata: { reason },
   }).then(() => fail(c, 403, 'forbidden', message));
 }
 
@@ -278,6 +293,16 @@ export const walletRoutes = new OpenAPIHono<AppEnv>()
         tenant,
         'wallet.credit.create',
         'Only owners and admins can add credit.',
+      );
+    }
+    if (!manualCreditAllowed(c.env)) {
+      return forbidden(
+        c,
+        db,
+        tenant,
+        'wallet.credit.create',
+        'On KNOQRA Cloud, credit comes from payments. Use Add funds.',
+        'edition',
       );
     }
     const body = c.req.valid('json');

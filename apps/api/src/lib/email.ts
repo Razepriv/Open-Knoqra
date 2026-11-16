@@ -1,28 +1,34 @@
 import type { Env } from '../env';
 import { logger } from './logger';
 
-export interface EmailSender {
-  send(to: string, subject: string, text: string): Promise<void>;
-}
-
-export interface SentEmail {
+/** One outgoing email. `text` is always set: every message has a plain-text version. */
+export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
+  html?: string;
+  /** Extra headers, such as List-Unsubscribe. */
+  headers?: Record<string, string>;
 }
+
+export interface EmailSender {
+  send(message: EmailMessage): Promise<void>;
+}
+
+export type SentEmail = EmailMessage;
 
 /** Outbox of the test sender. Tests run in the Worker's isolate, so they can read it directly. */
 export const sentEmails: SentEmail[] = [];
 
 export const inMemoryEmailSender: EmailSender = {
-  async send(to, subject, text) {
-    sentEmails.push({ to, subject, text });
+  async send(message) {
+    sentEmails.push(message);
   },
 };
 
 /** Local development: the message (including any link) goes to the log instead of a mailbox. */
 export const loggingEmailSender: EmailSender = {
-  async send(to, subject, text) {
+  async send({ to, subject, text }) {
     logger.info('email.dev_outbox', { to, subject, text });
   },
 };
@@ -32,7 +38,7 @@ export const loggingEmailSender: EmailSender = {
  * are bearer credentials.
  */
 export const unconfiguredEmailSender: EmailSender = {
-  async send(_to, subject) {
+  async send({ subject }) {
     logger.error('email.not_configured', { subject });
   },
 };
@@ -43,6 +49,8 @@ const RESEND_URL = 'https://api.resend.com/emails';
 export interface ResendOptions {
   apiKey: string;
   from: string;
+  /** Where replies go, for example a support inbox. */
+  replyTo?: string;
   fetch?: typeof fetch;
 }
 
@@ -52,15 +60,24 @@ export interface ResendOptions {
  */
 export function resendEmailSender(opts: ResendOptions): EmailSender {
   const doFetch = opts.fetch ?? fetch;
+  const replyTo = opts.replyTo?.trim();
   return {
-    async send(to, subject, text) {
+    async send({ to, subject, text, html, headers }) {
       const response = await doFetch(RESEND_URL, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${opts.apiKey}`,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ from: opts.from, to: [to], subject, text }),
+        body: JSON.stringify({
+          from: opts.from,
+          to: [to],
+          subject,
+          text,
+          ...(html ? { html } : {}),
+          ...(replyTo ? { reply_to: replyTo } : {}),
+          ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+        }),
         signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
       });
       if (!response.ok) {
@@ -72,11 +89,15 @@ export function resendEmailSender(opts: ResendOptions): EmailSender {
 }
 
 export function emailSenderFor(
-  env: Pick<Env, 'APP_ENV' | 'RESEND_API_KEY' | 'EMAIL_FROM'>,
+  env: Pick<Env, 'APP_ENV' | 'RESEND_API_KEY' | 'EMAIL_FROM' | 'EMAIL_REPLY_TO'>,
 ): EmailSender {
   if (env.APP_ENV === 'test') return inMemoryEmailSender;
   if (env.RESEND_API_KEY && env.EMAIL_FROM) {
-    return resendEmailSender({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM });
+    return resendEmailSender({
+      apiKey: env.RESEND_API_KEY,
+      from: env.EMAIL_FROM,
+      replyTo: env.EMAIL_REPLY_TO,
+    });
   }
   if (env.APP_ENV === 'development') return loggingEmailSender;
   return unconfiguredEmailSender;

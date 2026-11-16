@@ -11,6 +11,9 @@ FAKE_WEBHOOK_SECRET=replace-me-fake-webhook-secret
 # Optional: set both to send real mail through Resend. Unset, dev logs emails instead.
 # RESEND_API_KEY=re_replace_me
 # EMAIL_FROM=KNOQRA <no-reply@example.test>
+# EMAIL_REPLY_TO=help@example.test
+# EMAIL_POSTAL_ADDRESS=1 Example Street, Example City
+# BLOG_FEED_URL=https://example.test/rss.xml
 # Live-send gates: leave unset until approval is confirmed (US 10DLC; Meta WhatsApp).
 # SMS_10DLC_APPROVED=true
 # WHATSAPP_META_APPROVED=true

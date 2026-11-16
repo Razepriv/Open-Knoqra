@@ -1,6 +1,15 @@
+import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
+import { env } from 'cloudflare:workers';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import { auditEvent, member, withTenant } from '@knoqra/db';
 import { eq } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { Env } from '../src/env';
+import { requestAuth } from '../src/lib/auth-context';
+import type { AppEnv } from '../src/lib/context';
+import { requestDb } from '../src/lib/db';
+import { tenant } from '../src/middleware/tenant';
+import { manualCreditAllowed, walletRoutes } from '../src/routes/wallet';
 import { api, get, post, signUp, uniqueEmail, withAdminDb, withAppDb } from './helpers';
 
 type Envelope<T> = { data: T | null; error: { code: string; message: string } | null };
@@ -223,5 +232,53 @@ describe('tenant isolation', () => {
     const ledger = await data<LedgerPage>(await get('/api/v1/wallet/ledger', cookieB));
     expect(ledger.items).toHaveLength(1);
     expect(ledger.items[0]?.kind).toBe('credit');
+  });
+});
+
+describe('manual credit on KNOQRA Cloud', () => {
+  it('stays open on a self-hosted instance and in Cloud development and tests', () => {
+    expect(manualCreditAllowed({ KNOQRA_EDITION: 'selfhost', APP_ENV: 'production' })).toBe(true);
+    expect(manualCreditAllowed({ APP_ENV: 'staging' })).toBe(true);
+    expect(manualCreditAllowed({ KNOQRA_EDITION: 'cloud', APP_ENV: 'development' })).toBe(true);
+    expect(manualCreditAllowed({ KNOQRA_EDITION: 'cloud', APP_ENV: 'test' })).toBe(true);
+  });
+
+  it('refuses it in Cloud staging and production: credit comes only from payments', async () => {
+    expect(manualCreditAllowed({ KNOQRA_EDITION: 'cloud', APP_ENV: 'staging' })).toBe(false);
+    expect(manualCreditAllowed({ KNOQRA_EDITION: 'cloud', APP_ENV: 'production' })).toBe(false);
+    const cookie = await signUp(uniqueEmail('wallet-cloud-credit'));
+    const orgId = await orgOf(cookie);
+    const app = new OpenAPIHono<AppEnv>();
+    app.use('/api/v1/*', requestDb, requestAuth, tenant());
+    app.route('/', walletRoutes);
+    const ctx = createExecutionContext();
+    const response = await app.request(
+      '/api/v1/wallet/credits',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({
+          amountMicros: 1_000_000_000,
+          note: 'Free money',
+          idempotencyKey: 'cloud-credit-1',
+        }),
+      },
+      { ...env, KNOQRA_EDITION: 'cloud', APP_ENV: 'staging' } as Env,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    expect(response.status).toBe(403);
+    expect(await errorCode(response)).toBe('forbidden');
+    const denied = await withAdminDb((db) =>
+      db.select().from(auditEvent).where(eq(auditEvent.organizationId, orgId)),
+    );
+    expect(
+      denied.some(
+        (row) =>
+          row.action === 'wallet.credit.create' &&
+          row.outcome === 'denied' &&
+          (row.metadata as { reason?: string } | null)?.reason === 'edition',
+      ),
+    ).toBe(true);
   });
 });

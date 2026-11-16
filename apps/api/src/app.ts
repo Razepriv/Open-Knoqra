@@ -3,6 +3,7 @@ import { LICENSE_PUBLIC_KEY } from '@knoqra/core';
 import type { ErrorHandler } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
+import { UNSUBSCRIBE_PATH } from './email/unsubscribe';
 import { type ApiExtension, withExtensions } from './extensions';
 import { requestAuth } from './lib/auth-context';
 import type { AppEnv } from './lib/context';
@@ -26,6 +27,7 @@ import { contacts } from './routes/contacts';
 import { conversations } from './routes/conversations';
 import { devFakeProvider } from './routes/dev-fake-provider';
 import { devFakeVoice } from './routes/dev-fake-voice';
+import { emailUnsubscribe } from './routes/email-unsubscribe';
 import { health } from './routes/health';
 import { healthDeep } from './routes/health-deep';
 import { licenseGate, licenseRoutes } from './routes/license';
@@ -126,6 +128,11 @@ export function createApp(extensions: readonly ApiExtension[] = []): OpenAPIHono
 
   // Extension pages with no session (for example the cloud's license key issuing pages).
   for (const extension of extensions) extension.publicRoutes?.(app);
+
+  // The newsletter's signed unsubscribe link: no session, limited per address like the auth routes.
+  app.on(['GET', 'POST'], UNSUBSCRIBE_PATH, rateLimit(RULES.auth));
+  app.on('POST', UNSUBSCRIBE_PATH, requestDb);
+  app.route('/', emailUnsubscribe);
 
   // Durable per-address limits on the auth routes that guess or spend a secret. Registered before
   // the database chain, so a limited request opens no connection. Exact paths only: Better Auth

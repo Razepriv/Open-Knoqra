@@ -1,4 +1,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { Tx } from '@knoqra/db';
+import type { CronJob } from './cron/jobs';
+import type { NewsletterChange } from './email/newsletter';
 import type { Env } from './env';
 import type { AppEnv } from './lib/context';
 import type { CallPricing } from './lib/pricing';
@@ -22,6 +25,21 @@ export interface ApiExtension {
   routes?: (app: OpenAPIHono<AppEnv>) => void;
   /** How calls are priced. The first extension that sets one wins; the core prices calls flat. */
   pricing?: CallPricing;
+  /**
+   * Scheduled jobs of the edition, run beside the core's (cron/run.ts). Each cron expression must
+   * also be in the edition's wrangler config (`triggers.crons`) and must not be a core job's.
+   */
+  cronJobs?: readonly CronJob[];
+  /**
+   * The workspace's plan name for the welcome email, read inside that workspace's tenant
+   * transaction. The first extension that sets one wins; the core names no plan.
+   */
+  planName?: (tx: Tx) => Promise<string | null>;
+  /**
+   * Runs in the background after a user's newsletter choice changes (sign-up, Settings or the
+   * unsubscribe link), for example to keep a mailing list in step. Errors are logged, never shown.
+   */
+  newsletterChanged?: (env: Env, change: NewsletterChange) => Promise<void>;
 }
 
 /**

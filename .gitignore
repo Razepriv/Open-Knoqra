@@ -31,3 +31,6 @@ Thumbs.db
 # Self-host Worker configs written by `pnpm knoqra deploy` (settings live in .env.selfhost,
 # already ignored by .env.* above)
 apps/*/wrangler.selfhost.jsonc
+
+# Rendered email previews (pnpm --filter @knoqra/api email:preview)
+apps/api/.email-preview/

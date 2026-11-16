@@ -8,6 +8,8 @@ import type {
   DateRange,
   NumberOrderResult,
   NumberPurchaseProvider,
+  NumberReleaseProvider,
+  NumberReleaseResult,
   NumberSearch,
   NumbersProvider,
   ProviderBalance,
@@ -131,7 +133,12 @@ export interface TelnyxProviderOptions {
 }
 
 export class TelnyxProvider
-  implements VoiceProvider, NumbersProvider, NumberPurchaseProvider, BalanceProvider
+  implements
+    VoiceProvider,
+    NumbersProvider,
+    NumberPurchaseProvider,
+    NumberReleaseProvider,
+    BalanceProvider
 {
   /** The credential used by the latest `createClientSession`, so the caller can persist it. */
   lastTelephonyCredentialId: string | null;
@@ -193,6 +200,28 @@ export class TelnyxProvider
       status: mapOrderStatus(data.status),
       e164: data.phone_numbers?.[0]?.phone_number ?? input.e164,
     };
+  }
+
+  /**
+   * Releases a number: `DELETE /v2/phone_numbers/{id}`, which answers the number with status
+   * `deleted` and stops its monthly charge. A 404 means Telnyx no longer has it (an earlier release
+   * whose answer was lost), so it is `not_found`, not an error.
+   */
+  async releaseNumber(providerNumberId: string): Promise<NumberReleaseResult> {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(providerNumberId)) {
+      throw new TelnyxApiError(400, 'invalid_number_id');
+    }
+    const res = await this.fetchImpl(
+      `${this.apiBase}/phone_numbers/${encodeURIComponent(providerNumberId)}`,
+      { method: 'DELETE', headers: { authorization: `Bearer ${this.#apiKey}` } },
+    );
+    if (res.status === 404) {
+      await res.body?.cancel();
+      return 'not_found';
+    }
+    if (!res.ok) throw new TelnyxApiError(res.status, await errorCode(res));
+    await res.body?.cancel();
+    return 'released';
   }
 
   private async readAvailable(path: string): Promise<AvailableNumber[]> {

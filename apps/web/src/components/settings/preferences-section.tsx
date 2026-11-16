@@ -11,7 +11,9 @@ import { useToast } from '../use-toast';
 import { SettingsSection } from './section';
 
 type Prefs = Me['prefs'];
-type PrefsPatch = Partial<Pick<Prefs, 'notifyEmail' | 'notifyDesktop' | 'analyticsConsent'>>;
+type PrefsPatch = Partial<
+  Pick<Prefs, 'notifyEmail' | 'notifyDesktop' | 'analyticsConsent' | 'newsletter'>
+>;
 
 const THEMES: ReadonlyArray<{ value: ThemePreference; label: string }> = [
   { value: 'system', label: 'System' },
@@ -97,6 +99,13 @@ export function PreferencesSection({ me }: { me: Me }) {
           hint="Alerts on this computer while KNOQRA is open."
           checked={prefs.notifyDesktop}
           onChange={(event) => save.mutate({ notifyDesktop: event.target.checked })}
+        />
+        <CheckboxField
+          id="newsletter"
+          label="Product news"
+          hint="New features and new blog posts by email, a few times a month at most."
+          checked={prefs.newsletter}
+          onChange={(event) => save.mutate({ newsletter: event.target.checked })}
         />
         <CheckboxField
           id="analytics-consent"

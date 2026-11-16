@@ -34,6 +34,10 @@ export interface DeskExtension {
   DialRateNote?: ComponentType<{ rate: NonNullable<CallPreflight['rate']> }>;
   /** Extra lines under the Spend chart's legend on the Usage page. */
   SpendNotes?: ComponentType<{ summary: UsageSummary }>;
+  /** A panel at the end of the Numbers page, under the number list. */
+  NumbersPanel?: ComponentType<{ canManage: boolean }>;
+  /** A notice under the top bar on every signed-in page; renders nothing when there is none. */
+  ShellBanner?: ComponentType;
 }
 
 /**

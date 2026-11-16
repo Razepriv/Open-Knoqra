@@ -149,7 +149,10 @@ The generated API config always sets `KNOQRA_EDITION` to `selfhost`, `PROVIDER` 
 | `KNOQRA_DOMAIN` or `KNOQRA_WORKERS_SUBDOMAIN` | The domain, or the account's workers.dev subdomain. |
 | `CONNECTORS` | `telnyx`, `plivo` or `telnyx,plivo`. |
 | `TELNYX_PUBLIC_KEY` | Optional. The Telnyx webhook public key. |
-| `RESEND_API_KEY`, `EMAIL_FROM` | Optional. Password-reset mail. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Optional. Password-reset and welcome mail (branded HTML with a plain-text version; templates in `apps/api/src/email`). |
+| `EMAIL_REPLY_TO` | Optional. Where replies to your mail go, for example your support inbox. |
+| `EMAIL_POSTAL_ADDRESS` | Optional. Your postal address, one line, shown in every email footer. Required by law in marketing mail. |
+| `BLOG_FEED_URL` | Optional. An RSS 2.0 feed whose three newest posts appear in the welcome email. |
 | `AI_PROVIDER` | `mock`, `openai` or `chatgpt`. |
 | `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL` | For `openai` only. The model and base URL are optional. |
 | `KNOQRA_LICENSE_KEY` | Optional. The license key, instead of pasting it in the Desk. |

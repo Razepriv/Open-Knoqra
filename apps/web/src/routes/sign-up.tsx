@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
 import { AuthLayout } from '../components/auth-layout';
+import { CheckboxField } from '../components/checkbox-field';
 import { Field } from '../components/field';
 import { FormAlert } from '../components/form-alert';
 import { AuthSkeleton } from '../components/skeletons/auth-skeleton';
@@ -54,6 +55,8 @@ function SignUp() {
     const name = String(form.get('name') ?? '').trim();
     const email = String(form.get('email') ?? '').trim();
     const password = String(form.get('password') ?? '');
+    // Off unless ticked. The API stores the choice with its time and sends the welcome email.
+    const newsletter = form.get('newsletter') === 'on';
 
     const errors = validate(name, email, password);
     setFieldErrors(errors);
@@ -63,7 +66,9 @@ function SignUp() {
     setPending(true);
     let error: AuthErrorLike | null;
     try {
-      ({ error } = await authClient.signUp.email({ name, email, password }));
+      // `newsletter` is not a user field: the API's sign-up hook reads it from the body (auth.ts).
+      const body = { name, email, password, newsletter };
+      ({ error } = await authClient.signUp.email(body));
     } catch {
       error = { status: 0 }; // Network failure: show the generic retry copy.
     }
@@ -128,6 +133,13 @@ function SignUp() {
           autoComplete="new-password"
           hint={copy.passwordRule}
           error={fieldErrors.password}
+        />
+        <CheckboxField
+          id="newsletter"
+          name="newsletter"
+          label="Email me product news and new blog posts"
+          hint="A few emails a month at most. Unsubscribe in one click, or turn it off in Settings."
+          defaultChecked={false}
         />
         <FormAlert message={formError} />
         <Button
