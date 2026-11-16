@@ -1,0 +1,44 @@
+{
+  "data": {
+    "record_type": "event",
+    "id": "00000000-0000-4000-8000-0000000e0005",
+    "event_type": "message.finalized",
+    "occurred_at": "2026-11-13T21:32:14.148+00:00",
+    "payload": {
+      "record_type": "message",
+      "direction": "outbound",
+      "id": "00000000-0000-4000-8000-0000000a0001",
+      "type": "SMS",
+      "messaging_profile_id": "00000000-0000-4000-8000-00000000f001",
+      "organization_id": "00000000-0000-4000-8000-00000000f002",
+      "from": {
+        "phone_number": "+12025550100",
+        "carrier": "TELNYX LLC",
+        "line_type": "VoIP"
+      },
+      "to": [
+        {
+          "phone_number": "+12025550123",
+          "carrier": "T-MOBILE USA, INC.",
+          "line_type": "Wireless",
+          "status": "delivered"
+        }
+      ],
+      "cc": [],
+      "text": "Hello there!",
+      "media": [],
+      "encoding": "GSM-7",
+      "parts": 1,
+      "tags": [],
+      "received_at": "2026-11-13T21:32:13.552+00:00",
+      "sent_at": "2026-11-13T21:32:13.596+00:00",
+      "completed_at": "2026-11-13T21:32:14.148+00:00",
+      "valid_until": null,
+      "errors": []
+    }
+  },
+  "meta": {
+    "attempt": 1,
+    "delivered_to": "https://hooks.example.test/webhooks/telnyx"
+  }
+}

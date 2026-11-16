@@ -1,0 +1,20 @@
+{
+  "from": "+12025550100",
+  "to": "+12025550123",
+  "whatsapp_message": {
+    "type": "template",
+    "template": {
+      "name": "order_confirmation",
+      "language": { "policy": "deterministic", "code": "en_US" },
+      "components": [
+        {
+          "type": "body",
+          "parameters": [
+            { "type": "text", "text": "John" },
+            { "type": "text", "text": "ORD-12345" }
+          ]
+        }
+      ]
+    }
+  }
+}

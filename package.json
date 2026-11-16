@@ -1,0 +1,40 @@
+{
+  "name": "knoqra",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "homepage": "https://knoqra.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Razepriv/Open-Knoqra.git"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "check:imports": "node scripts/check-imports.mjs",
+    "check:placeholders": "node scripts/check-placeholders.mjs",
+    "check:editions": "node scripts/check-editions.mjs",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
+    "typecheck": "turbo run typecheck",
+    "docs:check": "node scripts/docs-check.mjs",
+    "format": "biome format --write .",
+    "api:generate": "pnpm --filter @knoqra/api emit-openapi && pnpm --filter @knoqra/api-client generate",
+    "knoqra": "node -- scripts/knoqra/cli.mjs",
+    "perf:seed": "pnpm --filter @knoqra/perf seed --",
+    "perf:explain": "pnpm --filter @knoqra/perf explain --",
+    "perf:load": "pnpm --filter @knoqra/perf load --",
+    "perf:realtime": "pnpm --filter @knoqra/perf realtime --",
+    "perf:web": "pnpm --filter @knoqra/perf web --"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
+    "turbo": "^2.11.10",
+    "typescript": "~6.0.3",
+    "yaml": "^2.9.1"
+  }
+}

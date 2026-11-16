@@ -1,0 +1,19 @@
+{
+  "data": {
+    "record_type": "event",
+    "id": "00000000-0000-4000-8000-0000000e000b",
+    "event_type": "call.initiated",
+    "occurred_at": "2026-11-13T21:50:00.000+00:00",
+    "payload": {
+      "call_control_id": "v3:fake-call-control-id",
+      "direction": "incoming",
+      "from": "+12025550123",
+      "to": "+12025550100",
+      "state": "parked"
+    }
+  },
+  "meta": {
+    "attempt": 1,
+    "delivered_to": "https://hooks.example.test/webhooks/telnyx"
+  }
+}

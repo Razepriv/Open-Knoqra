@@ -1,0 +1,19 @@
+/* Injected into every visual screenshot: nothing that blinks or draws a scrollbar. */
+*,
+*::before,
+*::after {
+  /* biome-ignore lint/complexity/noImportantStyles: a screenshot style must beat the page's own */
+  caret-color: transparent !important;
+  /* biome-ignore lint/complexity/noImportantStyles: a screenshot style must beat the page's own */
+  scroll-behavior: auto !important;
+}
+
+* {
+  /* biome-ignore lint/complexity/noImportantStyles: a screenshot style must beat the page's own */
+  scrollbar-width: none !important;
+}
+
+*::-webkit-scrollbar {
+  /* biome-ignore lint/complexity/noImportantStyles: a screenshot style must beat the page's own */
+  display: none !important;
+}

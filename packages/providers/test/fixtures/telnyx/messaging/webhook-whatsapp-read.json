@@ -1,0 +1,59 @@
+{
+  "data": {
+    "record_type": "event",
+    "id": "00000000-0000-4000-8000-0000000e000a",
+    "event_type": "message.read",
+    "occurred_at": "2026-11-13T21:41:00.000+00:00",
+    "payload": {
+      "record_type": "message",
+      "direction": "outbound",
+      "id": "00000000-0000-4000-8000-0000000a0002",
+      "type": "WHATSAPP",
+      "messaging_profile_id": "00000000-0000-4000-8000-00000000f001",
+      "organization_id": "00000000-0000-4000-8000-00000000f002",
+      "from": {
+        "phone_number": "+12025550100"
+      },
+      "to": [
+        {
+          "phone_number": "+12025550123",
+          "status": "read"
+        }
+      ],
+      "body": {
+        "type": "template",
+        "template": {
+          "name": "order_confirmation",
+          "language": {
+            "policy": "deterministic",
+            "code": "en_US"
+          },
+          "components": [
+            {
+              "type": "body",
+              "parameters": [
+                {
+                  "type": "text",
+                  "text": "John"
+                },
+                {
+                  "type": "text",
+                  "text": "ORD-12345"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "template_name": "order_confirmation",
+      "received_at": "2026-11-13T21:40:00.000+00:00",
+      "sent_at": "2026-11-13T21:40:00.500+00:00",
+      "completed_at": null,
+      "errors": []
+    }
+  },
+  "meta": {
+    "attempt": 1,
+    "delivered_to": "https://hooks.example.test/webhooks/telnyx"
+  }
+}

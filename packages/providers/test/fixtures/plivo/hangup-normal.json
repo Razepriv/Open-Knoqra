@@ -1,0 +1,17 @@
+{
+  "AnswerTime": "2026-11-11 10:00:05",
+  "BillDuration": "60",
+  "CallStatus": "completed",
+  "CallUUID": "cccccccc-0000-4000-8000-000000000001",
+  "Direction": "inbound",
+  "Duration": "55",
+  "EndTime": "2026-11-11 10:01:00",
+  "Event": "Hangup",
+  "From": "sip:knoqrafixture0000123456789012@phone.plivo.com",
+  "HangupCauseCode": "4000",
+  "HangupCauseName": "Normal Hangup",
+  "HangupSource": "Callee",
+  "StartTime": "2026-11-11 10:00:00",
+  "To": "+12025550123",
+  "TotalCost": "0.00850"
+}

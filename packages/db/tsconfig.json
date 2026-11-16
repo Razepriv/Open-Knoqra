@@ -1,0 +1,10 @@
+{
+  "extends": "@knoqra/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src", "scripts", "test", "pro", "vitest.config.ts", "drizzle.config.ts"]
+}

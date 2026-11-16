@@ -1,0 +1,14 @@
+{
+  "ALegRequestUUID": "cccccccc-0000-4000-8000-000000000001",
+  "ALegUUID": "cccccccc-0000-4000-8000-000000000001",
+  "BillRate": "0.00300",
+  "CallStatus": "in-progress",
+  "CallUUID": "cccccccc-0000-4000-8000-000000000001",
+  "Direction": "inbound",
+  "Event": "StartApp",
+  "From": "sip:knoqrafixture0000123456789012@phone.plivo.com",
+  "ParentAuthID": "MAFIXTUREAUTHID000000",
+  "SessionStart": "2026-11-11 10:00:00.123456",
+  "To": "+12025550123",
+  "X-PH-ClientState": "0123456789abcdef0123456789abcdef"
+}

@@ -1,0 +1,42 @@
+{
+  "data": [
+    {
+      "record_type": "available_phone_number",
+      "phone_number": "+12025550150",
+      "vanity_format": null,
+      "best_effort": false,
+      "quickship": true,
+      "reservable": true,
+      "region_information": [
+        { "region_type": "country_code", "region_name": "US" },
+        { "region_type": "rate_center", "region_name": "WASHINGTON" },
+        { "region_type": "state", "region_name": "DC" }
+      ],
+      "cost_information": {
+        "upfront_cost": "1.00",
+        "monthly_cost": "1.00",
+        "currency": "USD"
+      },
+      "features": [{ "name": "voice" }, { "name": "sms" }, { "name": "mms" }]
+    },
+    {
+      "record_type": "available_phone_number",
+      "phone_number": "+12025550151",
+      "vanity_format": null,
+      "best_effort": false,
+      "quickship": true,
+      "reservable": true,
+      "region_information": [
+        { "region_type": "country_code", "region_name": "US" },
+        { "region_type": "state", "region_name": "DC" }
+      ],
+      "cost_information": {
+        "upfront_cost": "0.50",
+        "monthly_cost": "1.25",
+        "currency": "USD"
+      },
+      "features": [{ "name": "voice" }]
+    }
+  ],
+  "meta": { "total_results": 2, "best_effort_results": 0 }
+}

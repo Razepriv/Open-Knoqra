@@ -1,0 +1,9 @@
+{
+  "extends": "@knoqra/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src", "pro", "vitest.config.ts"]
+}

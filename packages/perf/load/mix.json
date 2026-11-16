@@ -1,0 +1,142 @@
+{
+  "scenarios": [
+    {
+      "name": "contacts.list",
+      "weight": 15,
+      "requests": [{ "name": "list", "method": "GET", "path": "/api/v1/contacts?limit=50" }]
+    },
+    {
+      "name": "contacts.list.deep",
+      "weight": 5,
+      "requests": [
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/api/v1/contacts?limit=50&cursor={cursors.contactsDeep}"
+        }
+      ]
+    },
+    {
+      "name": "contacts.search",
+      "weight": 15,
+      "requests": [
+        {
+          "name": "search",
+          "method": "GET",
+          "path": "/api/v1/contacts?q={rotate:search.name|search.company|search.email|search.digits}"
+        }
+      ]
+    },
+    {
+      "name": "contact360",
+      "weight": 15,
+      "requests": [
+        { "name": "detail", "method": "GET", "path": "/api/v1/contacts/{ids.heavy}" },
+        {
+          "name": "permissions",
+          "method": "GET",
+          "path": "/api/v1/contacts/{ids.heavy}/permissions"
+        },
+        {
+          "name": "duplicates",
+          "method": "GET",
+          "path": "/api/v1/contacts/{ids.heavy}/duplicates"
+        },
+        {
+          "name": "timeline",
+          "method": "GET",
+          "path": "/api/v1/contacts/{ids.heavy}/timeline?limit=50"
+        }
+      ]
+    },
+    {
+      "name": "timeline.deep",
+      "weight": 10,
+      "requests": [
+        {
+          "name": "timeline",
+          "method": "GET",
+          "path": "/api/v1/contacts/{ids.heavy}/timeline?limit=50&cursor={cursors.timelineDeep}"
+        }
+      ]
+    },
+    {
+      "name": "inbox",
+      "weight": 10,
+      "requests": [
+        { "name": "list", "method": "GET", "path": "/api/v1/conversations?limit=50" },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/api/v1/conversations?limit=50&cursor={cursors.conversationsDeep}"
+        }
+      ]
+    },
+    {
+      "name": "inbox.search",
+      "weight": 5,
+      "requests": [
+        {
+          "name": "search",
+          "method": "GET",
+          "path": "/api/v1/conversations?q={rotate:search.conversationName|search.conversationDigits}&limit=50"
+        }
+      ]
+    },
+    {
+      "name": "thread",
+      "weight": 10,
+      "requests": [
+        {
+          "name": "timeline",
+          "method": "GET",
+          "path": "/api/v1/conversations/{ids.heavyConversation}/items?limit=50"
+        },
+        {
+          "name": "timeline",
+          "method": "GET",
+          "path": "/api/v1/conversations/{ids.heavyConversation}/items?limit=50&cursor={cursors.threadDeep}"
+        }
+      ]
+    },
+    {
+      "name": "calls",
+      "weight": 5,
+      "requests": [
+        { "name": "list", "method": "GET", "path": "/api/v1/calls?limit=50" },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/api/v1/calls?limit=50&cursor={cursors.callsDeep}"
+        }
+      ]
+    },
+    {
+      "name": "tasks",
+      "weight": 3,
+      "requests": [
+        { "name": "list", "method": "GET", "path": "/api/v1/tasks?status=open&limit=50" }
+      ]
+    },
+    {
+      "name": "notifications",
+      "weight": 2,
+      "requests": [{ "name": "list", "method": "GET", "path": "/api/v1/notifications?limit=20" }]
+    },
+    {
+      "name": "sign-in",
+      "weight": 5,
+      "requests": [
+        {
+          "name": "sign-in",
+          "method": "POST",
+          "path": "/api/auth/sign-in/email",
+          "body": {
+            "email": { "$fixture": "ownerA.email" },
+            "password": { "$fixture": "ownerA.password" }
+          }
+        }
+      ]
+    }
+  ]
+}

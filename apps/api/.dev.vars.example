@@ -1,0 +1,38 @@
+# Copy to .dev.vars (gitignored) for `pnpm --filter @knoqra/api dev`. Placeholder values only.
+# Optional: overrides the Hyperdrive local connection string. Must be the non-superuser app role.
+DATABASE_URL=postgres://knoqra_app:knoqra_app@localhost:54329/knoqra
+# At least 32 random characters, e.g. `openssl rand -base64 32`.
+BETTER_AUTH_SECRET=replace-me-with-32-plus-random-characters
+# The public web origin that serves /api, not the Worker's own port. In dev the browser talks to
+# the Vite server on 5173, which proxies /api to wrangler on 8787 and forwards the browser's Origin
+# unchanged. Better Auth trusts only this origin and builds its cookies and links from it.
+BETTER_AUTH_URL=http://localhost:5173
+FAKE_WEBHOOK_SECRET=replace-me-fake-webhook-secret
+# Optional: set both to send real mail through Resend. Unset, dev logs emails instead.
+# RESEND_API_KEY=re_replace_me
+# EMAIL_FROM=KNOQRA <no-reply@example.test>
+# Live-send gates: leave unset until approval is confirmed (US 10DLC; Meta WhatsApp).
+# SMS_10DLC_APPROVED=true
+# WHATSAPP_META_APPROVED=true
+# Required for the Telnyx connection API: base64 of 32 random bytes. Generate with
+# `openssl rand -base64 32`. Never commit a real value; losing it makes stored provider keys unreadable.
+CREDENTIALS_MASTER_KEY=replace-me-with-openssl-rand-base64-32
+# Optional: fake (default), or connectors to use each workspace's connected provider
+# (telnyx is the older name for connectors).
+# PROVIDER=fake
+# Optional: the providers Settings › Connectors offers. Unset: all outside production.
+# CONNECTORS=telnyx,plivo
+# Optional: the API's public origin, so Connectors shows full webhook URLs.
+# API_PUBLIC_ORIGIN=http://localhost:8787
+# Base64 Ed25519 public key for Telnyx webhooks (platform key). Unset, /webhooks/telnyx is a 404.
+# TELNYX_PUBLIC_KEY=replace-me
+# Optional observability (see docs/observability.md). Blank or unset means that integration is off.
+# SENTRY_DSN=
+# SENTRY_RELEASE=
+# SENTRY_TRACES_SAMPLE_RATE=
+# POSTHOG_KEY=
+# POSTHOG_HOST=
+# Edition: local dev runs without the license screen (wrangler.jsonc). Uncomment to try it.
+# KNOQRA_EDITION=selfhost
+# Self-host only, optional: the license key, instead of entering it in the Desk.
+# KNOQRA_LICENSE_KEY=

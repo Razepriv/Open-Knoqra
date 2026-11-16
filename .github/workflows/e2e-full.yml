@@ -1,0 +1,84 @@
+name: E2E (full)
+
+# The slow web suites CI's per-push run leaves out: the dead-control crawl and the axe scan, with
+# everything else. Nightly on main, and on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-full-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      MIGRATION_DATABASE_URL: postgres://knoqra:knoqra@localhost:54329/knoqra
+      DATABASE_URL: postgres://knoqra_app:knoqra_app@localhost:54329/knoqra
+      CI: "true"
+      KNOQRA_FULL_E2E: "1"
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: knoqra
+          POSTGRES_USER: knoqra
+          POSTGRES_PASSWORD: knoqra
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U knoqra -d knoqra"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create app role
+        run: psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -f docker/postgres/init/01-app-role.sql
+
+      - name: Migrate database
+        run: pnpm --filter @knoqra/db migrate
+
+      - name: Write API dev vars for E2E
+        run: |
+          {
+            echo "BETTER_AUTH_URL=http://localhost:5173"
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "FAKE_WEBHOOK_SECRET=$(openssl rand -base64 32)"
+            echo "CREDENTIALS_MASTER_KEY=$(openssl rand -base64 32)"
+            echo "DATABASE_URL=$DATABASE_URL"
+          } > apps/api/.dev.vars
+
+      - name: Install Playwright browser
+        run: pnpm --filter @knoqra/web exec playwright install --with-deps chromium
+
+      - name: E2E (full)
+        run: pnpm --filter @knoqra/web e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-full
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7

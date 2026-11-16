@@ -1,0 +1,13 @@
+{
+  "ALegRequestUUID": "cccccccc-0000-4000-8000-000000000002",
+  "ALegUUID": "cccccccc-0000-4000-8000-000000000002",
+  "BillRate": "0.00850",
+  "CallStatus": "ringing",
+  "CallUUID": "cccccccc-0000-4000-8000-000000000002",
+  "Direction": "inbound",
+  "Event": "StartApp",
+  "From": "12025550123",
+  "ParentAuthID": "MAFIXTUREAUTHID000000",
+  "SessionStart": "2026-11-11 11:00:00.000000",
+  "To": "12025550110"
+}

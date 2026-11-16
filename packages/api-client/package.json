@@ -1,0 +1,24 @@
+{
+  "name": "@knoqra/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "@knoqra/config": "workspace:*",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

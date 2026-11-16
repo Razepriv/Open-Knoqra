@@ -1,0 +1,9 @@
+{
+  "CallUUID": "cccccccc-0000-4000-8000-000000000001",
+  "DialAction": "answer",
+  "DialALegUUID": "cccccccc-0000-4000-8000-000000000001",
+  "DialBLegFrom": "12025550110",
+  "DialBLegStatus": "answer",
+  "DialBLegTo": "12025550123",
+  "DialBLegUUID": "dddddddd-0000-4000-8000-000000000001"
+}

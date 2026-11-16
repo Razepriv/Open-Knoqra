@@ -1,0 +1,72 @@
+name: Bug report
+description: Something is broken or behaves differently from what you expect
+title: "bug: "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security problems, do not use this form: see [SECURITY.md](https://github.com/Razepriv/Open-Knoqra/blob/main/SECURITY.md).
+        Please use fictional data. Never paste real phone numbers, tokens or secrets.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong, in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See the error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Which part of KNOQRA is affected?
+      options:
+        - web
+        - api
+        - mobile
+        - extension
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: A tag or the commit SHA you are running.
+      placeholder: "v0.1.0 or a1b2c3d"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and output
+      description: Relevant console output or API logs. Remove anything personal first.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this has not been reported
+          required: true

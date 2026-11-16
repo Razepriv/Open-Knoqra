@@ -1,0 +1,21 @@
+{
+  "name": "@knoqra/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@knoqra/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

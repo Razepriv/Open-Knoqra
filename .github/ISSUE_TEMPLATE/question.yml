@@ -1,0 +1,42 @@
+name: Question
+description: Ask a question about using or contributing to KNOQRA
+title: "question: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [README](https://github.com/Razepriv/Open-Knoqra/blob/main/README.md) and the [development guide](https://github.com/Razepriv/Open-Knoqra/blob/main/docs/development.md) first.
+        For security problems, do not use this form: see [SECURITY.md](https://github.com/Razepriv/Open-Knoqra/blob/main/SECURITY.md).
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What you are trying to do and what you have already tried.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - api
+        - db
+        - providers
+        - ui
+        - telephony
+        - messaging
+        - billing
+        - compliance
+        - ai
+        - infra
+        - mobile
+        - extension
+        - other
+    validations:
+      required: true

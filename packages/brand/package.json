@@ -1,0 +1,21 @@
+{
+  "name": "@knoqra/brand",
+  "version": "0.0.0",
+  "private": true,
+  "license": "SEE LICENSE IN README.md",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./assets/*": "./assets/*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@knoqra/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

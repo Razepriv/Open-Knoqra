@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: ["type:chore"]
+    commit-message:
+      prefix: "chore"
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript 7's native compiler has no stable JS API for drizzle-kit and Vitest yet.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Exact-pinned: upgrade by hand and re-run the auth and loading-state tests.
+      - dependency-name: ascii-reveal
+        update-types: ["version-update:semver-major"]
+      - dependency-name: better-auth
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ["type:chore"]
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]

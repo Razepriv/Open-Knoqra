@@ -1,0 +1,21 @@
+{
+  "data": {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "event_type": "call.answered",
+    "occurred_at": "2026-11-11T10:00:05.000000Z",
+    "record_type": "event",
+    "payload": {
+      "call_control_id": "v3:outgoing-call-1",
+      "call_leg_id": "leg-out-1",
+      "call_session_id": "session-out-1",
+      "client_state": "aWRlbV9rZXlfMQ==",
+      "connection_id": "conn-1",
+      "direction": "outgoing",
+      "from": "+12025550101",
+      "to": "+12025550123",
+      "state": "answered",
+      "start_time": "2026-11-11T10:00:00.000000Z"
+    }
+  },
+  "meta": { "attempt": 1, "delivered_to": "https://example.test/webhooks/telnyx" }
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "dependsOn": ["^build", "@knoqra/db#test"],
+      "passThroughEnv": ["DATABASE_URL", "MIGRATION_DATABASE_URL"]
+    }
+  }
+}

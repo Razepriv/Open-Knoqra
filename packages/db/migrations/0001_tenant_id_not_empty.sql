@@ -1,0 +1,2 @@
+ALTER TABLE "audit_event" ADD CONSTRAINT "audit_event_organization_id_not_empty" CHECK ("audit_event"."organization_id" <> '');--> statement-breakpoint
+ALTER TABLE "contact" ADD CONSTRAINT "contact_organization_id_not_empty" CHECK ("contact"."organization_id" <> '');

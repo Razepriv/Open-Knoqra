@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "dr-fixture-1",
+      "record_type": "call-control",
+      "started_at": "2026-11-11T10:00:00Z",
+      "billed_sec": 60,
+      "cost": "0.012000",
+      "currency": "USD"
+    },
+    {
+      "id": "dr-fixture-2",
+      "record_type": "call-control",
+      "started_at": "2026-11-11T11:30:00Z",
+      "billed_sec": 125,
+      "cost": "0.025000",
+      "currency": "USD"
+    }
+  ],
+  "meta": { "total_pages": 1, "total_results": 2, "page_number": 1, "page_size": 250 }
+}

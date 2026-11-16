@@ -1,0 +1,33 @@
+node_modules/
+dist/
+build/
+.turbo/
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+.superpowers/
+
+# Astro generated types and cache
+.astro/
+
+# TanStack Router dev cache
+.tanstack/
+
+# Perf run output (fixtures, reports)
+.perf/
+
+# Self-host Worker configs written by `pnpm knoqra deploy` (settings live in .env.selfhost,
+# already ignored by .env.* above)
+apps/*/wrangler.selfhost.jsonc

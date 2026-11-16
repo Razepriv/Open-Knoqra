@@ -1,0 +1,21 @@
+{
+  "data": {
+    "id": "12ade33a-21c0-473b-b055-b3c836e1c292",
+    "record_type": "number_order",
+    "status": "pending",
+    "phone_numbers_count": 1,
+    "connection_id": "conn-1",
+    "customer_reference": null,
+    "created_at": "2026-11-13T10:00:00.000000+00:00",
+    "updated_at": "2026-11-13T10:00:00.000000+00:00",
+    "phone_numbers": [
+      {
+        "id": "dc8e4d67-33a0-4cbb-af74-7b58f05bd494",
+        "record_type": "number_order_phone_number",
+        "phone_number": "+12025550150",
+        "status": "pending",
+        "regulatory_requirements": []
+      }
+    ]
+  }
+}

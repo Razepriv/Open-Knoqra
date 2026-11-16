@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "code": "40300",
+      "title": "Blocked (STOP)",
+      "detail": "Messages cannot be sent from +12025550100 to +12025550123 due to an existing block rule.",
+      "source": { "pointer": "/to" }
+    }
+  ]
+}

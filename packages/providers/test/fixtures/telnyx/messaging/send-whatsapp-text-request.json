@@ -1,0 +1,8 @@
+{
+  "from": "+12025550100",
+  "to": "+12025550123",
+  "whatsapp_message": {
+    "type": "text",
+    "text": { "body": "Thanks for reaching out! How can we help?" }
+  }
+}

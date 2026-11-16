@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: knoqra
+      POSTGRES_USER: knoqra
+      POSTGRES_PASSWORD: knoqra
+    ports:
+      - "54329:5432"
+    volumes:
+      - knoqra-pg:/var/lib/postgresql/data
+      # Runs once, on first init of an empty volume: creates the non-superuser app role.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knoqra -d knoqra"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  knoqra-pg:

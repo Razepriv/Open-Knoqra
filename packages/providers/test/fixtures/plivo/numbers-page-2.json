@@ -1,0 +1,26 @@
+{
+  "api_id": "8b5a8d6c-0000-4000-8000-000000000002",
+  "meta": {
+    "limit": 20,
+    "next": null,
+    "offset": 20,
+    "previous": "/v1/Account/MAFIXTUREAUTHID000000/Number/?limit=20&offset=0",
+    "total_count": 21
+  },
+  "objects": [
+    {
+      "number": "12025550111",
+      "alias": "voice only",
+      "added_on": "2026-11-02",
+      "application": null,
+      "carrier": "Plivo",
+      "region": "District of Columbia, UNITED STATES",
+      "number_type": "local",
+      "monthly_rental_rate": "0.50000",
+      "sms_enabled": false,
+      "mms_enabled": false,
+      "voice_enabled": true,
+      "resource_uri": "/v1/Account/MAFIXTUREAUTHID000000/Number/12025550111/"
+    }
+  ]
+}

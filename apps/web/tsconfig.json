@@ -1,0 +1,20 @@
+{
+  "extends": "@knoqra/config/tsconfig.react.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "noEmit": true,
+    // vite.config.ts imports ./sentry-upload.ts with its extension (Vite's native config loader).
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src",
+    "pro",
+    "worker",
+    "e2e",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "sentry-upload.ts",
+    "sentry-upload.test.ts"
+  ]
+}

@@ -1,0 +1,7 @@
+Name,Phone,Company,Email,Title,Timezone,Tags
+Ada Lovelace,+1 202 555 0101,Analytical Engines,ada@example.test,Founder,America/New_York,vip;early
+Grace Hopper,+12025550102,Navy,grace@example.test,Admiral,,
+Alan Turing,+12025550103,,,,,
+Margaret Hamilton,,Apollo,margaret@example.test,,,
+Katherine Johnson,+12025550104,NASA,not-an-email,,,
+Ada Lovelace Again,+12025550101,,,,,

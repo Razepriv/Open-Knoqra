@@ -1,0 +1,35 @@
+{
+  "name": "@knoqra/perf",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx src/seed/index.ts",
+    "explain": "tsx src/explain/index.ts",
+    "load": "tsx src/load/index.ts",
+    "realtime": "tsx src/realtime/index.ts",
+    "web": "tsx src/web/index.ts"
+  },
+  "dependencies": {
+    "@knoqra/api": "workspace:*",
+    "@knoqra/core": "workspace:*",
+    "@knoqra/db": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.18",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "@knoqra/config": "workspace:*",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
+    "lighthouse": "^13.6.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

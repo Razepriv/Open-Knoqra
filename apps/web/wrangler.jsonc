@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "knoqra-web",
+  "main": "worker/index.ts",
+  // Keep in step with apps/api/wrangler.jsonc.
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Only /api/* reaches the Worker script; every other path is served as a static asset.
+    "run_worker_first": ["/api/*"]
+  },
+  // Same-origin API: /api/* goes to the knoqra-api Worker over a service binding.
+  "services": [{ "binding": "API", "service": "knoqra-api" }]
+
+  // Deployments: `pnpm knoqra deploy` writes wrangler.selfhost.jsonc from this file with your
+  // Worker names, routes, Hyperdrive id and the rate limits (docs/self-host.md).
+}

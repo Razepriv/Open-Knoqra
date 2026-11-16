@@ -1,0 +1,1680 @@
+# Tracker seed: GitHub milestones and issues.
+# Schema: milestones: [{title, description, due_on?}], issues: [{title, milestone, labels, body}].
+# Every issue's milestone must match a milestone title, and every label must exist in
+# .github/labels.yml. `pnpm docs:check` enforces both.
+
+milestones:
+  - title: M0 Foundation
+    description: Monorepo, CI and deploy pipeline, design tokens and UI kit, tenant-scoped schema with row-level security, auth and personal workspaces, Hono API, webhook ingest and queue, OpenAPI client, fake provider.
+  - title: M1 Desk shell & contacts
+    description: App shell (rail, header, theme), Contacts, Contact 360 with timeline, consent and provenance, duplicate suggestion, CSV import, plus the sign-in, reset, MFA and settings screens.
+  - title: M2 Voice
+    description: Telnyx credentials and WebRTC token, dialer states, live panel, call dock, outcomes, voicemail, webhook to queue to normalization to Durable Object fan-out, ledger reserve, capture and release, WARN and STOP caps.
+  - title: M3 Inbox (SMS & WhatsApp)
+    description: SMS and WhatsApp threads, composer states (free, template, paused, blocked), delivery status chain, internal notes. Live sending is gated behind 10DLC registration and Meta approval.
+  - title: M4 Numbers & usage
+    description: Numbers setup checks and capability tiles, Telnyx balance polling, Usage page and ledger with CSV export, daily reconciliation, first-run setup wizard.
+  - title: M5 Today & Otto
+    description: Today screen (week grid, streak, heatmap, goal ring, focus timer, widgets), tasks, notifications, command palette, and the Otto assistant on a mock AI provider.
+  - title: M6 Hardening
+    description: Full E2E matrix, accessibility pass, security review, state coverage for every view, and a small live telephony test on owner-authorized numbers.
+issues:
+  - title: "M0 Foundation: monorepo, auth, tenancy, webhooks, Desk shell"
+    milestone: M0 Foundation
+    labels:
+      - type:feature
+      - area:infra
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The base everything else builds on. It shipped as milestone M0 and is in review; this issue tracks it and is closed when the foundation lands on main.
+
+      ## Scope
+
+      - pnpm and Turborepo monorepo with Biome, Vitest and Playwright
+      - Tenant-scoped schema with forced row-level security and the `knoqra_app` runtime role
+      - Better Auth with personal workspaces, Hono API, contacts endpoints and audit events
+      - Idempotent webhook ingest, provider-events queue with a dead-letter queue, fake provider
+      - OpenAPI spec and generated typed client
+      - Design tokens, UI kit including `Skeleton` and `Reveal`, Desk shell with sign-in and sign-up
+      - CI and gated Cloudflare and Neon deploy workflows
+
+      ## Acceptance criteria
+
+      - [ ] CI is green on main
+      - [ ] Docs, templates and the roadmap are in the repository
+      - [ ] Staging deploy verified with `DEPLOY_ENABLED` set (see docs/deploy.md)
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M0).
+  - title: "App shell: navigation rail, header and theme persistence"
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - area:ui
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The Desk currently has a home route and a component showcase. Every later screen lives inside a shared shell.
+
+      ## Scope
+
+      - Responsive layout: three panes at 1280px and wider, the context ribbon as a drawer from 1024 to 1279px, one column below 1024px
+      - Navigation rail, header with workspace label and user menu
+      - Light and dark theme toggle that persists per user
+      - Route stubs for Contacts, Inbox, Calls, Numbers, Usage and Today with Skeleton loading states
+
+      ## Acceptance criteria
+
+      - [ ] Layout matches the design at all three breakpoints
+      - [ ] Theme choice survives reload and uses design tokens only
+      - [ ] Keyboard navigation reaches the rail and header
+      - [ ] Playwright test covers navigation and theme persistence
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Contacts list view
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The API returns contacts for the active organization; the Desk has no UI for them yet.
+
+      ## Scope
+
+      - Searchable, sortable list on top of `GET /api/v1/contacts`
+      - Create-contact dialog with phone and time zone validation and the API error messages
+      - Empty, loading (`Skeleton`, `Reveal`) and error states
+      - Wire to the pagination work in the "Contacts list pagination" issue
+
+      ## Acceptance criteria
+
+      - [ ] A new contact appears in the list without a reload
+      - [ ] Duplicate and invalid phone numbers show a clear inline error
+      - [ ] Loading uses `Skeleton` and `Reveal` only
+      - [ ] Playwright test covers create and list
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: "Contact 360: timeline, consent and provenance"
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - area:db
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      A contact page is the hub for calls, messages and notes. It needs a timeline projection and shows where each fact came from.
+
+      ## Scope
+
+      - `GET /api/v1/contacts/{id}` detail view with edit and archive
+      - Timeline event model (projection) and read endpoint, tenant-scoped with forced RLS
+      - Provenance: source of the contact and of each consent record
+      - Placeholder timeline entries that M2 and M3 fill with calls and messages
+
+      ## Acceptance criteria
+
+      - [ ] New tables have forced RLS and isolation tests
+      - [ ] Cross-tenant access returns 404 and writes an audit row
+      - [ ] Page handles empty, loading, error and permission-denied states
+      - [ ] OpenAPI client regenerated
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Per-channel contact permissions (consent)
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:db
+      - area:api
+      - area:compliance
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Consent and eligibility are enforced on the server. Permissions are stored per contact and per channel: manual call, SMS, WhatsApp, AI voice and recording.
+
+      ## Scope
+
+      - `contact_permission_event`: an append-only table with forced RLS, one row per grant or revocation with source, evidence and timestamp (the current state is the latest event per channel)
+      - Endpoints to read and change permissions, audited
+      - Policy helper in `packages/core` that answers "may we use this channel for this contact"
+      - Consent row UI in Contact 360
+
+      ## Acceptance criteria
+
+      - [ ] Revocation takes effect immediately for later checks
+      - [ ] Every change writes an audit event
+      - [ ] Unit tests cover the policy helper, integration tests cover isolation
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Duplicate contact suggestion
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Phone numbers are unique per organization, but the same person can arrive under a different number or spelling.
+
+      ## Scope
+
+      - Suggest likely duplicates by name and email (phone numbers are already unique per organization)
+      - Merge flow that keeps provenance and re-points timeline entries
+      - Dismiss a suggestion permanently
+
+      ## Acceptance criteria
+
+      - [ ] Merge is atomic and audited
+      - [ ] Dismissed suggestions do not return
+      - [ ] Tests cover merge isolation between tenants
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: CSV contact import with field mapping
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Users bring existing contact lists. Import must map arbitrary columns and report problems row by row.
+
+      ## Scope
+
+      - Upload and preview, then map columns to contact fields
+      - Server-side validation with E.164 normalization and per-row error report
+      - Duplicate handling: skip or update, chosen by the user
+      - Parse in the browser and send batches of 500 rows to the API. Storing the file in R2 and processing it asynchronously is deferred until files outgrow the browser
+
+      ## Acceptance criteria
+
+      - [ ] A 5,000-row file imports without timing out
+      - [ ] Rejected rows can be downloaded as CSV
+      - [ ] Imported contacts record `source = import`
+      - [ ] Tests include malformed and hostile files
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Password reset and two-factor screens
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The server supports password reset and the two-factor plugin; the Desk has only sign-in and sign-up.
+
+      ## Scope
+
+      - Forgot-password and reset-password screens
+      - TOTP setup with QR code and backup codes, and the sign-in challenge
+      - Error states mapped through the existing auth error helper
+
+      ## Acceptance criteria
+
+      - [ ] A user can enable and use TOTP end to end
+      - [ ] Reset flow works once the email sender issue is done
+      - [ ] Playwright test covers TOTP with a generated code
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: "Settings: profile, time zone, devices and notifications"
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Users need to manage their own account and see where they are signed in.
+
+      ## Scope
+
+      - Profile and time zone
+      - Session and device list with revoke
+      - Notification preferences and theme
+
+      ## Acceptance criteria
+
+      - [ ] Revoking a session signs that device out on its next request
+      - [ ] Time zone is validated as an IANA zone
+      - [ ] Settings page has empty, loading and error states
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: Contacts list pagination
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:feature
+      - area:api
+      - area:web
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      `GET /api/v1/contacts` returns every contact of the organization. That does not scale.
+
+      ## Scope
+
+      - Cursor pagination on `(display_name, id)` with a bounded page size
+      - Update the OpenAPI schema and regenerate the client
+      - Infinite scroll or paging in the list view
+
+      ## Acceptance criteria
+
+      - [ ] Default and maximum page sizes are documented
+      - [ ] Ordering is stable across pages
+      - [ ] Isolation test confirms pages never cross tenants
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Real email sender (Resend) for password reset
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:security
+      - area:api
+      - area:infra
+      - priority:p0
+      - phase:1
+    body: |
+      ## Context
+
+      Pre-production blocker. Staging and production use `unconfiguredEmailSender`, which only logs an error, so password reset cannot work when deployed.
+
+      ## Scope
+
+      - Implement an `EmailSender` that calls the Resend HTTP API with `fetch`
+      - Select it for staging and production in `emailSenderFor`, keep the logging sender for development
+      - Add the Resend API key as a Worker secret and document it in docs/deploy.md
+      - Never log message bodies: reset links are bearer credentials
+
+      ## Acceptance criteria
+
+      - [ ] A password reset email arrives in staging
+      - [ ] Failures are logged without the link and surface as a generic response
+      - [ ] Unit test covers the sender with a mocked `fetch`
+      - [ ] docs/deploy.md lists the new secret
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Disable organization deletion and invite endpoints until teams ship
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:security
+      - area:api
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Better Auth mounts the organization plugin routes, including invitations and organization deletion. In Phase 1 each user has one personal workspace, so invitations should not be reachable, and a user must not be able to delete their only workspace.
+
+      ## Scope
+
+      - Block or remove invite, member, organization deletion and other organization management routes under `/api/auth`
+      - Keep the routes the Desk actually needs (session and active organization)
+      - Re-enable deliberately in Phase 2
+
+      ## Acceptance criteria
+
+      - [ ] Calls to the invite and organization deletion endpoints return 404 or 403
+      - [ ] A regression test lists the blocked paths
+      - [ ] Sign-up and workspace creation still work
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Server-side merge history on the contact
+    milestone: M6 Hardening
+    labels:
+      - type:feature
+      - area:api
+      - area:web
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Contact 360 shows past merges by scanning the contact's timeline for merge events, up to 1,000 events. A contact with a longer timeline can hide old merge provenance.
+
+      ## Scope
+
+      - Return the contacts merged into a contact (`mergedFrom`) from the contact detail endpoint
+      - Use it in the Contact 360 provenance panel and drop the client-side scan
+
+      ## Acceptance criteria
+
+      - [ ] Merge history is complete however long the timeline is
+      - [ ] The detail endpoint stays tenant-scoped and audited
+      - [ ] OpenAPI client regenerated
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+  - title: Enable Biome css.parser.tailwindDirectives and fold tailwind-sources.pcss into styles.css
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:chore
+      - area:web
+      - priority:p1
+      - phase:1
+      - good first issue
+    body: |
+      ## Context
+
+      Biome could not parse Tailwind directives, so `@source` lives in `apps/web/src/tailwind-sources.pcss` as a workaround. Newer Biome versions can parse them with `css.parser.tailwindDirectives`.
+
+      ## Scope
+
+      - Enable the option in `biome.json` once the installed Biome supports it
+      - Move the `@source` line back into `styles.css` and delete the `.pcss` file and its import
+      - Update the troubleshooting note in docs/development.md
+
+      ## Acceptance criteria
+
+      - [ ] `pnpm lint` passes
+      - [ ] The Tailwind build still picks up classes from `packages/ui`
+      - [ ] No `.pcss` workaround remains
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Telnyx credentials and short-lived WebRTC token
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:api
+      - area:telephony
+      - area:providers
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The browser dials through the Telnyx WebRTC client, which must only ever receive a short-lived token.
+
+      ## Scope
+
+      - Store per-organization provider credentials with AES-GCM envelope encryption, show only the last four characters
+      - Endpoint that mints a short-lived client token through `VoiceProvider.createClientSession`
+      - Platform key stays a Worker secret and never reaches the web build
+
+      ## Acceptance criteria
+
+      - [ ] No secret appears in logs, responses or the web bundle (`check:secrets` still passes)
+      - [ ] Token expiry is enforced and tested
+      - [ ] Credentials are tenant-scoped with forced RLS
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M2).
+  - title: TelnyxProvider voice adapter and webhook adapter
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:providers
+      - area:telephony
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Only the fake provider exists. Real calls need a Telnyx implementation of the provider interfaces.
+
+      ## Scope
+
+      - Implement `VoiceProvider` and `WebhookAdapter` for Telnyx behind `@knoqra/providers`
+      - Register `telnyx` in `/webhooks/:provider` alongside `fake`
+      - Ed25519 signature verification with WebCrypto and a timestamp window
+      - Contract tests shared with the fake provider
+
+      ## Acceptance criteria
+
+      - [ ] App code imports only the interfaces
+      - [ ] Bad signatures and stale timestamps are rejected
+      - [ ] Tests run without network access
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Call state machine in packages/core
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:telephony
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Call state must be deterministic and testable apart from any provider.
+
+      ## Scope
+
+      - States: queued, initiating, ringing, connected, ending, completed, plus failed, busy, no_answer, canceled
+      - Pure transition function with illegal transitions rejected
+      - Test-first, property tests for ordering and duplicates
+
+      ## Acceptance criteria
+
+      - [ ] Every transition is covered by a test
+      - [ ] Out-of-order provider events do not corrupt state
+      - [ ] Coverage on the module is at least 80%
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M2).
+  - title: Normalize provider events into calls and call events
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:api
+      - area:db
+      - area:telephony
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The queue consumer currently only sets `processed_at`. It should turn raw events into domain records.
+
+      ## Scope
+
+      - `Call` and `CallEvent` tables with forced RLS
+      - Resolve the owning organization from the number or call, then write inside `withTenant`
+      - Keep the consumer idempotent: a redelivery changes nothing
+      - Fan out to the realtime Durable Object after commit
+
+      ## Acceptance criteria
+
+      - [ ] Replaying the same event produces one call event
+      - [ ] Unknown calls are parked, not dropped
+      - [ ] Dead-lettered messages are inspectable
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M2).
+  - title: "Realtime Durable Objects: OrgRealtime and UserCallLock"
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:api
+      - area:infra
+      - area:telephony
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The Desk needs live call and message updates, and one user must not hold two active calls.
+
+      ## Scope
+
+      - `OrgRealtime` with WebSocket hibernation, fan-out per organization
+      - `UserCallLock` enforcing one active call per user
+      - Client subscription that updates the TanStack Query cache
+      - Authenticate the socket with the session and re-check membership
+
+      ## Acceptance criteria
+
+      - [ ] A second dial attempt is rejected while a call is active
+      - [ ] Idle sockets cost nothing (hibernation)
+      - [ ] A user cannot subscribe to another organization
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Dialer, live call panel, call dock and outcomes
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:web
+      - area:telephony
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The core calling experience in the Desk.
+
+      ## Scope
+
+      - Dialer states: plain, blocked and review
+      - Live panel, call dock, mute and hang up, microphone permission handling
+      - Outcome logging and voicemail playback
+      - Keyboard-operable dialer
+
+      ## Acceptance criteria
+
+      - [ ] Blocked numbers explain why, using server-side policy results
+      - [ ] Mic denied shows a recoverable state
+      - [ ] E2E covers a fake inbound call to outcome to timeline event
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M2).
+  - title: "Ledger: reserve, capture, release and spend caps"
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:db
+      - area:billing
+      - area:api
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Spend must be controlled and explainable. Money is integer micros (1 USD = 1,000,000).
+
+      ## Scope
+
+      - Immutable ledger with reserve, capture, release and adjust entries and idempotency keys
+      - Wallet balance derived from the ledger
+      - WARN and STOP caps, plus low-balance and STOP-cap UI states
+      - Policy engine: do-not-call, consent per channel, caps
+
+      ## Acceptance criteria
+
+      - [ ] No float money anywhere
+      - [ ] Duplicate webhooks produce one settlement
+      - [ ] Ledger invariants have property tests
+      - [ ] Balance after reserve, capture and release is exact
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M2).
+  - title: Add a Telnyx "ignored" webhook outcome
+    milestone: M2 Voice
+    labels:
+      - type:feature
+      - area:providers
+      - area:api
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      Telnyx sends many event types KNOQRA does not model. `WebhookAdapter.parse` can only succeed or return `invalid_payload`, so a harmless unknown event would be answered with 400 and retried.
+
+      ## Scope
+
+      - Extend the parse result with an `ignored` outcome
+      - Answer 200 for ignored events without storing or enqueueing them
+      - Log the ignored event type at debug level
+
+      ## Acceptance criteria
+
+      - [ ] Unknown but well-formed events return 200 and are not queued
+      - [ ] Malformed payloads still return 400
+      - [ ] Fake provider contract tests updated
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Verify webhook signatures over raw bytes
+    milestone: M2 Voice
+    labels:
+      - type:security
+      - area:api
+      - area:providers
+      - priority:p1
+      - phase:1
+    body: |
+      ## Context
+
+      The webhook route reads the body with `c.req.text()` and verifies over that string. Telnyx signs the exact bytes, and decoding can change them.
+
+      ## Scope
+
+      - Read the body once as an `ArrayBuffer` and pass bytes to `WebhookAdapter.verify`
+      - Parse JSON from the same bytes after verification
+      - Update the fake provider to sign over the raw bytes, and its tests
+      - Avoid parsing the body twice (once in `parse`, once for storage)
+
+      ## Acceptance criteria
+
+      - [ ] A body with non-UTF-8 or unusual whitespace still verifies correctly
+      - [ ] A single byte change fails verification
+      - [ ] No behavior change for the fake provider
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: "Conversations and messages: schema and API"
+    milestone: M3 Inbox (SMS & WhatsApp)
+    labels:
+      - type:feature
+      - area:db
+      - area:api
+      - area:messaging
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      SMS and WhatsApp share one conversation model per contact.
+
+      ## Scope
+
+      - `Conversation`, `Message` and `MessageTemplate` tables with forced RLS
+      - List and send endpoints in the OpenAPI document
+      - Inbound message normalization from provider events
+
+      ## Acceptance criteria
+
+      - [ ] Cross-tenant reads and writes are rejected and tested
+      - [ ] Messages appear on the Contact 360 timeline
+      - [ ] Client regenerated
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M3).
+  - title: SMS send and receive pipeline with delivery status chain
+    milestone: M3 Inbox (SMS & WhatsApp)
+    labels:
+      - type:feature
+      - area:api
+      - area:providers
+      - area:messaging
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Messages move through queued, sent, delivered or failed, driven by provider events.
+
+      ## Scope
+
+      - Send through `MessagingProvider.sendSms` with idempotency keys
+      - Apply `message.sent`, `delivered`, `failed` and `received` events
+      - STOP and START keywords suppress and restore the channel
+
+      ## Acceptance criteria
+
+      - [ ] A duplicate delivery receipt changes nothing
+      - [ ] STOP blocks later sends server-side
+      - [ ] Status chain is visible per message
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M3).
+  - title: WhatsApp 24-hour window and template messages
+    milestone: M3 Inbox (SMS & WhatsApp)
+    labels:
+      - type:feature
+      - area:api
+      - area:messaging
+      - area:compliance
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      WhatsApp only allows free-form replies inside a 24-hour customer-care window; outside it only approved templates may be sent.
+
+      ## Scope
+
+      - Window tracking from the last inbound message
+      - Template storage and selection
+      - Server-side enforcement in the policy engine
+
+      ## Acceptance criteria
+
+      - [ ] A free-form send outside the window is refused by the server
+      - [ ] Window state is exposed to the UI
+      - [ ] Tests use a controllable clock
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M3).
+  - title: "Inbox UI: threads, composer states and internal notes"
+    milestone: M3 Inbox (SMS & WhatsApp)
+    labels:
+      - type:feature
+      - area:web
+      - area:messaging
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The Desk side of messaging.
+
+      ## Scope
+
+      - Thread list and thread view with Skeleton and Reveal loading
+      - Composer states: free, template, paused and blocked, each explaining why
+      - Internal notes that never leave KNOQRA
+      - Window banner
+
+      ## Acceptance criteria
+
+      - [ ] Composer state always reflects server policy
+      - [ ] Notes are visually distinct from messages
+      - [ ] E2E covers send, delivery and a blocked state
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M3).
+  - title: Gate live sending behind 10DLC and Meta approval
+    milestone: M3 Inbox (SMS & WhatsApp)
+    labels:
+      - type:feature
+      - area:compliance
+      - area:messaging
+      - area:api
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Live SMS and WhatsApp need carrier registration and Meta approval. Until then sending must be paused, not attempted.
+
+      ## Scope
+
+      - Per-number registration status and a global send gate in the policy engine
+      - UI explains the paused state and what is needed
+      - Fake provider keeps working for development
+
+      ## Acceptance criteria
+
+      - [ ] No live send is possible while the gate is closed
+      - [ ] Status changes are audited
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M3).
+  - title: "Numbers screen: setup checks and capability tiles"
+    milestone: M4 Numbers & usage
+    labels:
+      - type:feature
+      - area:web
+      - area:telephony
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Users need to see whether a number can call, text and use WhatsApp.
+
+      ## Scope
+
+      - `PhoneNumber` and `ChannelConnection` tables and API
+      - Capability tiles and setup checks for each number
+      - Surfaces registration status from M3
+
+      ## Acceptance criteria
+
+      - [ ] Each capability shows ready, pending or blocked with a reason
+      - [ ] Tenant isolation tests for the new tables
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M4).
+  - title: First-run setup wizard
+    milestone: M4 Numbers & usage
+    labels:
+      - type:feature
+      - area:web
+      - area:telephony
+      - priority:p2
+      - phase:1
+      - status:needs-design
+    body: |
+      ## Context
+
+      A new workspace needs guided setup: connect Telnyx, choose a number, test audio, place an authorized test call.
+
+      ## Scope
+
+      - Wizard flow with resumable progress
+      - Audio test and an authorized test call
+      - Clear failure messages at each step
+
+      ## Acceptance criteria
+
+      - [ ] A new user reaches a working call without reading docs
+      - [ ] Wizard can be skipped and resumed
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: Telnyx balance polling cron
+    milestone: M4 Numbers & usage
+    labels:
+      - type:feature
+      - area:api
+      - area:billing
+      - area:infra
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The wallet needs to know the provider balance without a user action.
+
+      ## Scope
+
+      - Cron Trigger that polls the platform balance
+      - Store snapshots and raise low-balance state
+      - Failures are logged without secrets
+
+      ## Acceptance criteria
+
+      - [ ] A failed poll does not break the app
+      - [ ] Cron is idempotent and covered by tests
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M4).
+  - title: Usage page and ledger table with CSV export
+    milestone: M4 Numbers & usage
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - area:billing
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Costs must be transparent: every charge is visible and exportable.
+
+      ## Scope
+
+      - `UsageEvent` table and ledger list endpoint
+      - Usage page with filters and totals in exact micros
+      - CSV export written to R2 and downloaded through a short-lived link
+
+      ## Acceptance criteria
+
+      - [ ] Totals equal the sum of ledger entries
+      - [ ] Exports are tenant-scoped
+      - [ ] Empty, loading and error states
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M4).
+  - title: Daily ledger reconciliation
+    milestone: M4 Numbers & usage
+    labels:
+      - type:feature
+      - area:api
+      - area:billing
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The ledger and the provider can drift. A daily job compares them and flags differences.
+
+      ## Scope
+
+      - Cron Trigger comparing ledger totals with `VoiceProvider.fetchUsage`
+      - Record discrepancies and show them to the owner
+      - No automatic adjustments without an audit entry
+
+      ## Acceptance criteria
+
+      - [ ] A seeded discrepancy is detected in tests
+      - [ ] Reconciliation can be re-run safely
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M4).
+  - title: "Today screen: week grid, streak, heatmap and goal ring"
+    milestone: M5 Today & Otto
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The streak features from the design: a daily goal that rewards consistent follow-up.
+
+      ## Scope
+
+      - `StreakDay` computed from logged outcomes, rolled over at midnight in the user time zone
+      - Week grid, streak, heatmap and goal ring
+      - Cron rollover per time zone
+
+      ## Acceptance criteria
+
+      - [ ] Streaks respect the user time zone and daylight saving changes
+      - [ ] Computation has unit tests with a fake clock
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M5).
+  - title: Focus timer and customizable widgets
+    milestone: M5 Today & Otto
+    labels:
+      - type:feature
+      - area:web
+      - area:db
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Users arrange the Today screen to taste.
+
+      ## Scope
+
+      - Focus timer widget
+      - `UserPrefs` for daily goal, widget order and hidden widgets
+      - Drag to reorder and hide
+
+      ## Acceptance criteria
+
+      - [ ] Layout persists across devices
+      - [ ] Reorder is keyboard accessible
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M5).
+  - title: Tasks and reminders
+    milestone: M5 Today & Otto
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - area:db
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Follow-ups need a home beyond the timeline.
+
+      ## Scope
+
+      - `Task` table with forced RLS, list, create and complete endpoints
+      - Reminders delivered through notifications and email
+      - Tasks linked to contacts
+
+      ## Acceptance criteria
+
+      - [ ] Due tasks appear on Today and in notifications
+      - [ ] Tenant isolation tests
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: Notifications panel and reminder cron
+    milestone: M5 Today & Otto
+    labels:
+      - type:feature
+      - area:web
+      - area:api
+      - area:infra
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The bell icon needs content, and reminders need a trigger.
+
+      ## Scope
+
+      - Notification store, panel with read and unread state
+      - Cron Trigger that creates due reminders
+      - Respect notification preferences from Settings
+
+      ## Acceptance criteria
+
+      - [ ] Marking read is idempotent
+      - [ ] No duplicate reminders after a cron retry
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: Command palette (Ctrl/Cmd+K)
+    milestone: M5 Today & Otto
+    labels:
+      - type:feature
+      - area:web
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Keyboard-first navigation and actions.
+
+      ## Scope
+
+      - Palette with search over contacts and actions
+      - Platform-correct shortcut, focus trap and escape handling
+      - Extensible command registry
+
+      ## Acceptance criteria
+
+      - [ ] Fully keyboard operable and screen-reader labelled
+      - [ ] Playwright test opens the palette and runs a command
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: 'Otto assistant: drafts, briefs and "what did I miss" on the mock AI provider'
+    milestone: M5 Today & Otto
+    labels:
+      - type:feature
+      - area:ai
+      - area:web
+      - area:providers
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Otto drafts replies, writes call briefs and summarizes missed activity. The real AI provider is decided later, so everything runs against `MockAiProvider`.
+
+      ## Scope
+
+      - Wrap the supplied Otto component as a React component
+      - `OttoDraft` records with source citations and metering
+      - Calls go only through `AiProvider`
+
+      ## Acceptance criteria
+
+      - [ ] Swapping the provider changes no app code
+      - [ ] Every draft lists its sources
+      - [ ] AI output is never sent without a person confirming
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M5).
+  - title: Full E2E matrix
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:web
+      - area:api
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The end-to-end suite today covers sign-up, sign-in and the showcase. Phase 1 needs the compliance scenarios.
+
+      ## Scope
+
+      - Duplicate webhook, do-not-call block, WhatsApp window expired, 10DLC paused, STOP, microphone denied, low wallet mid-call, cross-tenant access denied
+      - All against the fake provider
+      - Stable in CI with retries off for new tests
+
+      ## Acceptance criteria
+
+      - [ ] Every scenario has a passing Playwright test
+      - [ ] Suite finishes in a reasonable CI time
+      - [ ] Failures upload traces
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Accessibility pass
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:web
+      - area:ui
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The Desk should be usable by keyboard and screen reader.
+
+      ## Scope
+
+      - Keyboard-operable dialer and inbox
+      - Visible focus states and labels on every control
+      - Reduced-motion behavior for `Reveal`
+      - Automated axe checks in Playwright
+
+      ## Acceptance criteria
+
+      - [x] No serious axe violations on main routes (`e2e/a11y.spec.ts`, every route and open state, both themes)
+      - [ ] Manual keyboard walk-through recorded in the PR
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Empty, loading, error and permission-denied states for every view
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:web
+      - area:ui
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Every view needs the four states, built with `Skeleton` and `Reveal`.
+
+      ## Scope
+
+      - Audit each route against the four states
+      - Shared error and permission-denied components
+      - Copy reviewed for clarity
+
+      ## Acceptance criteria
+
+      - [x] A checklist shows each view covered (`docs/quality.md`, "State coverage")
+      - [x] No gray-box skeletons remain (layout-shaped outlines per route, `pnpm check:imports` guard)
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "UI the designs don't cover".
+  - title: Phone Inbox shifts as the thread list loads
+    milestone: M6 Hardening
+    labels:
+      - type:bug
+      - area:web
+      - area:messaging
+      - priority:p2
+      - phase:1
+      - status:needs-design
+    body: |
+      ## Context
+
+      Below 1024px the Inbox stacks the thread list above the conversation, and the list's height
+      follows its row count. The outline cannot know that count, so content under the list moves
+      when it loads. `e2e/skeletons.spec.ts` measures CLS 0.25 on the list and 0.34 with a thread
+      open at 390px (the budget is 0.01). It records this as an annotation, not a failure.
+
+      ## Scope
+
+      - Decide the phone layout: a list with a fixed, scrolling height, or the list and the open
+        thread as separate views
+      - Make the outline match, and turn the spec annotation into an assertion
+
+      ## Acceptance criteria
+
+      - [ ] Phone Inbox CLS at most 0.01 in `e2e/skeletons.spec.ts`, list and open thread
+
+      ## Spec reference
+
+      `docs/quality.md`, "Skeletons".
+  - title: First visual baselines on the Mac and CI's Linux image
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:web
+      - area:infra
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The visual suite (`e2e/visual.spec.ts`, `e2e/visual-skeletons.spec.ts`) is in place, but Phase 1
+      ships no baselines: images made on the Windows development machine would match neither the
+      Mac nor CI. Until a platform's folder exists, the `visual` project is skipped there.
+
+      ## Scope
+
+      - Generate and review the darwin set on the Mac (`docs/quality.md`, "Generating baselines")
+      - Generate the linux set on CI's image and commit it, so CI guards visuals
+
+      ## Acceptance criteria
+
+      - [ ] `__baselines__/darwin/` and `__baselines__/linux/` committed, each passing twice with zero diff
+      - [ ] CI runs the `visual` project
+
+      ## Spec reference
+
+      `docs/quality.md`, "Visual baselines".
+  - title: Durable Better Auth rate limiting and the cf-connecting-ip header
+    milestone: M6 Hardening
+    labels:
+      - type:security
+      - area:api
+      - area:infra
+      - priority:p0
+      - phase:1
+    body: |
+      ## Context
+
+      Pre-production blocker. Better Auth uses an in-memory rate limiter, which is per isolate and resets often. It also has no trusted client IP header configured on Cloudflare.
+
+      ## Scope
+
+      - Back the limiter with durable storage (the Workers Rate Limiting binding, a Durable Object or a database table)
+      - Configure Better Auth to read the client IP from `cf-connecting-ip`
+      - Limit sign-in, sign-up and password reset more strictly
+      - Document the bindings in docs/deploy.md and the wrangler env blocks
+
+      ## Acceptance criteria
+
+      - [ ] Repeated failed sign-ins are limited across isolates
+      - [ ] Spoofed forwarding headers do not change the client identity
+      - [ ] Tests cover both limits and the header
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Security review
+    milestone: M6 Hardening
+    labels:
+      - type:security
+      - area:api
+      - area:db
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      A structured review before the first production deploy.
+
+      ## Scope
+
+      - Tenant isolation, auth, webhook verification and secrets handling
+      - Dependency and Worker configuration review
+      - Fix or file every finding
+
+      ## Acceptance criteria
+
+      - [ ] No open critical or high findings
+      - [ ] Review notes summarized in the PR
+      - [ ] SECURITY.md known gaps section updated
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Live telephony experiment on owner-authorized numbers
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:telephony
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      A small, controlled run against the real provider to validate cost and call quality before any wider use.
+
+      ## Scope
+
+      - Run only on numbers the owner controls and has authorized
+      - Record actual per-minute and per-message costs against the ledger
+      - Write up findings
+
+      ## Acceptance criteria
+
+      - [ ] Ledger and provider usage agree to the unit
+      - [ ] No unauthorized number is ever dialed
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Neon branch per pull request for preview deploys
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:infra
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      CI uses a service container. Previews and integration checks would be closer to production with a Neon branch for each PR.
+
+      ## Scope
+
+      - Workflow step that creates a Neon branch for the PR and deletes it on close
+      - Run migrations as the owner role and create the `knoqra_app` role on the branch
+      - Never expose branch credentials to forked PRs
+
+      ## Acceptance criteria
+
+      - [ ] A PR gets an isolated database
+      - [ ] Branches are cleaned up when the PR closes
+      - [ ] Fork PRs still pass CI using the service container
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Testing and CI".
+  - title: Projects board automation
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:infra
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The tracker should reflect work without manual dragging.
+
+      ## Scope
+
+      - GitHub Project with Status, Milestone and Priority fields
+      - Workflow that adds new issues and pull requests to the project
+      - Move items on open, review and merge
+
+      ## Acceptance criteria
+
+      - [ ] New issues land on the board automatically
+      - [ ] Merged PRs move their linked issues to Done
+
+      ## Spec reference
+
+      `docs/roadmap/issues.yml` and `ROADMAP.md`.
+  - title: "Harden deploy trust boundary before enabling DEPLOY_ENABLED"
+    milestone: M6 Hardening
+    labels:
+      - type:security
+      - area:infra
+      - priority:p0
+      - phase:1
+    body: |
+      ## Context
+
+      The deploy workflow holds Cloudflare and database owner credentials. Before the repository variable `DEPLOY_ENABLED` is set to `true`, the trust boundary around those credentials must be tightened.
+
+      ## Scope
+
+      - Move `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `MIGRATION_DATABASE_URL_<ENV>` to environment secrets on the `staging` and `production` GitHub environments
+      - Require reviewers on the `production` environment
+      - Add a tag ruleset restricting who can create `v*` tags
+      - Pin `cloudflare/wrangler-action` (and other third-party actions) to full commit SHAs
+
+      ## Acceptance criteria
+
+      - [ ] No deploy credential exists as a repository secret
+      - [ ] A production deploy waits for a required reviewer
+      - [ ] Only the intended people can create `v*` tags
+      - [ ] All third-party actions in deploy.yml are pinned to SHAs
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Gate /showcase to non-production
+    milestone: M6 Hardening
+    labels:
+      - type:security
+      - area:web
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The `/showcase` route renders the UI kit for development. It should not be reachable on the production Desk.
+
+      ## Scope
+
+      - Exclude the route (and its code) from production builds, or redirect it when the build is production
+      - Keep it available in development and staging
+
+      ## Acceptance criteria
+
+      - [ ] `/showcase` is not served in the production build
+      - [ ] `/showcase` still works under `pnpm dev`
+      - [ ] A test or build check covers the gate
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: "Threat model: auth tables and provider_event_raw have no RLS"
+    milestone: M6 Hardening
+    labels:
+      - type:security
+      - area:db
+      - area:api
+      - priority:p0
+      - phase:1
+    body: |
+      ## Context
+
+      Better Auth tables and `provider_event_raw` are deliberately outside row-level security, so their isolation rests on application code. That reliance is not yet written down as a threat model.
+
+      ## Scope
+
+      - List every table without RLS and who can reach it
+      - Document the application-level controls for each (membership re-check, route gating, no tenant query access)
+      - Add the model to `SECURITY.md` and `docs/architecture.md`
+      - File follow-up issues for any control that is missing
+
+      ## Acceptance criteria
+
+      - [ ] Every non-RLS table has a documented owner and control
+      - [ ] A test or review step asserts no tenant route reads these tables directly
+      - [ ] SECURITY.md links the threat model
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: "Review redactMessage: pg messages may embed input values"
+    milestone: M6 Hardening
+    labels:
+      - type:security
+      - area:api
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      `redactMessage` in the logger may keep Postgres error messages that embed input values (for example unique-violation detail with the offending value), which can leak personal data into logs.
+
+      ## Scope
+
+      - Audit which pg and Drizzle error messages carry bound values
+      - Redact or drop the message text for database errors outside development
+      - Add tests with representative pg errors
+
+      ## Acceptance criteria
+
+      - [ ] No phone number or email from a failed insert appears in non-development logs
+      - [ ] Tests cover unique violation and invalid-input errors
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Calls and voicemails follow the target contact on merge
+    milestone: M6 Hardening
+    labels:
+      - type:bug
+      - area:api
+      - area:db
+      - area:telephony
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Contact merge re-points timeline and consent events to the target contact, but not `call.contact_id` or `voicemail.contact_id`. After a merge, the source's calls and voicemails stay attached to the merged-away contact.
+
+      ## Scope
+
+      - Re-point `call.contact_id` and `voicemail.contact_id` from the source to the target in the merge transaction, through the composite tenant foreign keys `(organization_id, contact_id)`
+      - Add tests for calls and voicemails on a merged contact
+
+      ## Acceptance criteria
+
+      - [ ] After a merge, Recents shows the source's calls under the target contact
+      - [ ] After a merge, Voicemail shows the source's voicemails under the target contact
+      - [ ] After a merge, the target's timeline shows the source's calls
+      - [ ] Tests cover both tables
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M6).
+  - title: Fake provider and webhook polish
+    milestone: M2 Voice
+    labels:
+      - type:chore
+      - area:api
+      - area:providers
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Follow-ups from the M0 review of the fake provider and the webhook route. Signing over raw bytes is tracked in "Verify webhook signatures over raw bytes".
+
+      ## Scope
+
+      - Export `SIGNATURE_HEADER` from the providers package and use it in the route and tests instead of the string literal
+      - Avoid parsing the webhook body twice
+      - Add an HTTP-level test that a new event is queued exactly once (needs a queue double the Worker can reach)
+
+      ## Acceptance criteria
+
+      - [ ] `SIGNATURE_HEADER` is a single exported constant
+      - [ ] The body is parsed once on the ingest path
+      - [ ] An HTTP-level test proves exactly-once enqueue
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Tech stack".
+  - title: Web auth polish
+    milestone: M1 Desk shell & contacts
+    labels:
+      - type:chore
+      - area:web
+      - area:ui
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      Small gaps in the M0 sign-in and sign-up flow found in review.
+
+      ## Scope
+
+      - Map the missing Better Auth errors: PASSWORD_TOO_LONG, EMAIL_NOT_VERIFIED and HTTP 429
+      - Redirect to `/sign-in` when `/me` returns 401
+      - Distinguish an API outage from being signed out
+      - Give field errors live regions (`aria-live`)
+      - Add sr-only text to the Skeleton status
+      - Add a lint rule against importing `ascii-reveal` directly (use `Skeleton` and `Reveal`)
+
+      ## Acceptance criteria
+
+      - [ ] Each listed error shows a specific, friendly message
+      - [ ] An expired session lands on `/sign-in`
+      - [ ] An API outage shows an error state, not the sign-in screen
+      - [ ] Screen readers announce field errors and loading state
+      - [ ] Lint fails on a direct `ascii-reveal` import
+
+      ## Spec reference
+
+      `docs/superpowers/specs/2026-11-11-knoqra-phase1-design.md`, "Build milestones" (M1).
+
+  - title: "Tests for M1 review fixes verified only by inspection"
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:web
+      - area:api
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      The final M1 review fixes are correct by inspection and pass the E2E suite, but no test fails if some of them are reverted.
+
+      ## Scope
+
+      - Theme press before `/me` loads leaves the `['me']` query recoverable
+      - One in-flight theme save across the top bar toggle and the Settings pills
+      - Contact caches invalidated after an import run settles
+      - Sessions list refetched after two-factor is turned on or off
+      - Toast live region mounted before its message
+      - Route-level retry of import, merge and dismiss on a deadlock
+      - The "Stop and leave" path of the import exit prompt
+
+      ## Acceptance criteria
+
+      - [ ] Each item has a unit or E2E test that fails when the fix is reverted
+  - title: "Share the display-name rule between API and web"
+    milestone: M6 Hardening
+    labels:
+      - type:chore
+      - area:web
+      - area:api
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      `isSafeText` lives in `apps/api`. The web sign-up and profile forms carry a copy of the control-character rule, and the web maps a sign-up 400 to the name field by matching the message text, because the Better Auth hook sends no error code.
+
+      ## Scope
+
+      - Move `isSafeText` into `packages/core` and use it from both apps
+      - Send a specific error code from the Better Auth name hook and map on the code
+
+      ## Acceptance criteria
+
+      - [ ] One implementation of the rule, tested once
+      - [ ] The web maps the refusal by code, not by message text
+  - title: "Rapid toggling of two preferences can briefly revert one"
+    milestone: M6 Hardening
+    labels:
+      - type:bug
+      - area:web
+      - priority:p2
+      - phase:1
+    body: |
+      ## Context
+
+      On Settings, toggling email then desktop notifications quickly fires two `PATCH /me/prefs` requests. The first one's settle refetch can land before the second save and briefly show the second checkbox in its old state.
+
+      ## Scope
+
+      - Serialise preference saves, or skip the settle refetch while another save is in flight
+
+      ## Acceptance criteria
+
+      - [ ] Two quick toggles never show a reverted state, including on a slow server

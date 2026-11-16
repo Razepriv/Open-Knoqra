@@ -1,0 +1,14 @@
+{
+  "account_type": "standard",
+  "address": "",
+  "api_id": "8b5a8d6c-0000-4000-8000-000000000006",
+  "auth_id": "MAFIXTUREAUTHID000000",
+  "auto_recharge": false,
+  "billing_mode": "prepaid",
+  "cash_credits": "12.34500",
+  "city": "",
+  "name": "Fixture Account",
+  "resource_uri": "/v1/Account/MAFIXTUREAUTHID000000/",
+  "state": "",
+  "timezone": "America/New_York"
+}

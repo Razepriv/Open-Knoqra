@@ -1,0 +1,21 @@
+{
+  "records": [
+    {
+      "phoneNumber": "+12025550100",
+      "campaignId": "cmp-fixture-1",
+      "assignmentStatus": "ASSIGNED"
+    },
+    {
+      "phoneNumber": "+12025550102",
+      "campaignId": "cmp-fixture-1",
+      "assignmentStatus": "PENDING_ASSIGNMENT"
+    },
+    {
+      "phoneNumber": "+12025550103",
+      "campaignId": "cmp-fixture-1",
+      "assignmentStatus": "FAILED_ASSIGNMENT"
+    }
+  ],
+  "page": 1,
+  "totalRecords": 3
+}

@@ -1,0 +1,111 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794409122893,
+      "tag": "0000_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794409925613,
+      "tag": "0001_tenant_id_not_empty",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794433714135,
+      "tag": "0002_fearless_pride",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794434124941,
+      "tag": "0003_hot_adam_warlock",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794487440712,
+      "tag": "0004_mixed_morph",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794504716014,
+      "tag": "0005_remarkable_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794513877142,
+      "tag": "0006_square_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794520529742,
+      "tag": "0007_odd_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794576735861,
+      "tag": "0008_brief_jane_foster",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794586655257,
+      "tag": "0009_fuzzy_overlord",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794598435992,
+      "tag": "0010_short_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794604733219,
+      "tag": "0011_steady_ghost_rider",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794626642048,
+      "tag": "0012_uneven_korg",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794761153317,
+      "tag": "0013_connectors",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794764915865,
+      "tag": "0014_instance_license",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+@import "tailwindcss";
+/* Tailwind source paths: Biome 2 cannot parse @source in .css (tailwindDirectives is off). */
+@import "./tailwind-sources.pcss";
+@import "@knoqra/tokens/tokens.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* App-level colour for inline errors, readable on both themes. */
+:root {
+  --font-sans: "Inter Variable", Inter, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter Variable", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --danger-text: #a8322f;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --danger-text: #f49a93;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --danger-text: #f49a93;
+    color-scheme: dark;
+  }
+}
+
+/* The page around the shell canvas. In a browser the canvas fills the window edge to edge on the
+   shell colour. The desktop app opts into the floating rounded frame: index.html sets
+   html[data-shell="framed"] there. --page-pad is the gap around the canvas, which the sticky rail
+   and ribbon subtract (packages/ui shell-layout.ts). Keep the outline in index.html in step. */
+:root {
+  --page-pad: 0px;
+}
+:root[data-shell="framed"] {
+  --page-pad: 8px;
+}
+@media (min-width: 640px) {
+  :root[data-shell="framed"] {
+    --page-pad: 16px;
+  }
+}
+@media (min-width: 1024px) {
+  :root[data-shell="framed"] {
+    --page-pad: 24px;
+  }
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--shell);
+  }
+  body {
+    font-family: var(--font-sans);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    transition:
+      background-color var(--dur-theme) ease,
+      color var(--dur-theme) ease;
+  }
+  html[data-shell="framed"],
+  html[data-shell="framed"] body {
+    background: var(--page);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat utility classes */
+      transition-duration: 1ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat utility classes */
+      animation-duration: 1ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat utility classes */
+      animation-iteration-count: 1 !important;
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat utility classes */
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Entrance used by the ui Toast (animate-[kq-rise_...]); @knoqra/ui ships no CSS of its own. */
+@keyframes kq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

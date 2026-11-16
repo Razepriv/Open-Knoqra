@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "pn-fixture-0102",
+      "record_type": "phone_number",
+      "phone_number": "+12025550102",
+      "status": "purchase-pending",
+      "connection_id": null,
+      "messaging_profile_id": "mp-fixture-1"
+    },
+    {
+      "id": "pn-fixture-0103",
+      "record_type": "phone_number",
+      "phone_number": "+12025550103",
+      "status": "disabled",
+      "connection_id": null,
+      "messaging_profile_id": "mp-fixture-1"
+    }
+  ],
+  "meta": { "total_pages": 2, "total_results": 4, "page_number": 2, "page_size": 2 }
+}

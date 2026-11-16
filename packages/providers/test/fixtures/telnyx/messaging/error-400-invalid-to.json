@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "code": "40310",
+      "title": "Invalid 'to' address",
+      "detail": "The 'to' address +12025550123 is invalid for key KEY_FAKE_0000000000000000",
+      "source": { "pointer": "/to" }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+# Canonical label set. Synced with `gh label create <name> --color <color> --description <text> --force`.
+# Colors are 6-digit hex without the leading #. Keep descriptions under 100 characters.
+
+# Type
+- name: "type:bug"
+  color: E5534B
+  description: "Something is broken or behaves incorrectly"
+- name: "type:feature"
+  color: C9FA74
+  description: "New capability or improvement"
+- name: "type:chore"
+  color: 9AA39D
+  description: "Tooling, dependencies, CI and maintenance"
+- name: "type:docs"
+  color: 6B7A72
+  description: "Documentation only"
+- name: "type:security"
+  color: B8322F
+  description: "Security hardening or a vulnerability fix"
+
+# Area
+- name: "area:web"
+  color: 21513C
+  description: "Desk web app (apps/web)"
+- name: "area:api"
+  color: 21513C
+  description: "API Worker (apps/api)"
+- name: "area:db"
+  color: 21513C
+  description: "Schema, migrations and row-level security"
+- name: "area:providers"
+  color: 21513C
+  description: "Provider interfaces and adapters (Telnyx, fake, AI)"
+- name: "area:ui"
+  color: 21513C
+  description: "Component kit and design tokens"
+- name: "area:telephony"
+  color: 21513C
+  description: "Voice calls, numbers and call state"
+- name: "area:messaging"
+  color: 21513C
+  description: "SMS and WhatsApp threads and delivery"
+- name: "area:billing"
+  color: 21513C
+  description: "Wallet, ledger, usage and spend caps"
+- name: "area:compliance"
+  color: 21513C
+  description: "Consent, do-not-call, windows and eligibility rules"
+- name: "area:ai"
+  color: 21513C
+  description: "AI assistant and AI provider features"
+- name: "area:infra"
+  color: 21513C
+  description: "CI, deploys and Cloudflare or Neon setup"
+- name: "area:mobile"
+  color: 21513C
+  description: "Mobile apps (maintained in a separate repository)"
+- name: "area:extension"
+  color: 21513C
+  description: "Browser extension (maintained in a separate repository)"
+
+# Priority
+- name: "priority:p0"
+  color: E5534B
+  description: "Blocker: data loss, security, a broken main, or a pre-production blocker"
+- name: "priority:p1"
+  color: E8A33D
+  description: "Important: needed for the current milestone"
+- name: "priority:p2"
+  color: D9DED6
+  description: "Later: scheduled after the current milestone"
+
+# Phase
+- name: "phase:1"
+  color: C9FA74
+  description: "Phase 1, personal communications"
+- name: "phase:2"
+  color: B6DE69
+  description: "Phase 2, teams, support tickets, billing and CRM"
+- name: "phase:3"
+  color: A3C15E
+  description: "Phase 3, AI go-to-market"
+- name: "phase:4"
+  color: 90A453
+  description: "Phase 4, revenue operations"
+
+# Status
+- name: "status:blocked"
+  color: E8A33D
+  description: "Waiting on another issue, a decision or an external dependency"
+- name: "status:needs-design"
+  color: D8C9A3
+  description: "Needs a UI or design decision before work starts"
+
+# Community
+- name: "good first issue"
+  color: 5E9E7E
+  description: "Well scoped and a good place to start"
+- name: "help wanted"
+  color: A8C5B4
+  description: "Maintainers would welcome a contribution"
+- name: question
+  color: D9DED6
+  description: "A question about using or contributing to KNOQRA"

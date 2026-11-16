@@ -1,0 +1,14 @@
+{
+  "CallUUID": "cccccccc-0000-4000-8000-000000000001",
+  "DialAction": "hangup",
+  "DialALegUUID": "cccccccc-0000-4000-8000-000000000001",
+  "DialBLegBillDuration": "0",
+  "DialBLegDuration": "0",
+  "DialBLegFrom": "12025550110",
+  "DialBLegHangupCauseCode": "3010",
+  "DialBLegHangupCauseName": "Busy Line",
+  "DialBLegHangupSource": "Callee",
+  "DialBLegStatus": "busy",
+  "DialBLegTo": "12025550123",
+  "DialBLegUUID": "dddddddd-0000-4000-8000-000000000001"
+}

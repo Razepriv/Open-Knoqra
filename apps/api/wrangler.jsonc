@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "knoqra-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Cron triggers, one per CRON_JOBS entry in src/cron/jobs.ts: stale-call sweep, provider balance
+  // poll, ledger reconcile. Env blocks redeclare them.
+  "triggers": { "crons": ["*/5 * * * *", "*/30 * * * *", "15 3 * * *"] },
+  // KNOQRA_EDITION: local development and tests run as the cloud edition, so the license screen
+  // never blocks contributors. Set KNOQRA_EDITION=selfhost in .dev.vars to try it. A self-hosted
+  // deployment sets "selfhost" (wrangler.selfhost.jsonc does; unset also means selfhost).
+  "vars": {
+    "APP_ENV": "development",
+    "PROVIDER": "fake",
+    "KNOQRA_EDITION": "cloud"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Placeholder: replaced by the real Hyperdrive config id at deploy time.
+      // Caching must be disabled at creation: `wrangler hyperdrive create ... --caching-disabled`.
+      "id": "00000000000000000000000000000000",
+      // Local dev only. Uses the non-superuser app role so row-level security applies.
+      "localConnectionString": "postgres://knoqra_app:knoqra_app@localhost:54329/knoqra"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "PROVIDER_EVENTS", "queue": "knoqra-provider-events" }],
+    "consumers": [
+      {
+        "queue": "knoqra-provider-events",
+        "max_retries": 5,
+        "dead_letter_queue": "knoqra-provider-events-dlq",
+        // Local dev only: deliver within a second so simulated calls and messages feel live.
+        "max_batch_timeout": 1
+      },
+      // Exhausted events: src/index.ts routes dead-letter batches (`-dlq` names) to queue/dead-letter.ts.
+      { "queue": "knoqra-provider-events-dlq" }
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ORG_REALTIME", "class_name": "OrgRealtime" },
+      { "name": "USER_CALL_LOCK", "class_name": "UserCallLock" }
+    ]
+  },
+  // No top-level "ratelimits": local dev and the test pool run from this block, and a simulated
+  // limiter there would throttle suites that sign up and dial freely. Without a binding the rule
+  // lets every request through (src/lib/rate-limit.ts). Deployed configs declare them.
+  // Top level only: migrations apply to every environment. SQLite-backed classes.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrgRealtime", "UserCallLock"] }]
+
+  // Deployments: `pnpm knoqra deploy` writes wrangler.selfhost.jsonc from this file with your
+  // Worker names, routes, Hyperdrive id and the rate limits (docs/self-host.md).
+}

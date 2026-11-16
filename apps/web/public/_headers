@@ -1,0 +1,9 @@
+# Cache policy for the Desk's static assets (Workers Static Assets).
+# Hashed files under /assets/ never change once built, so they are immutable and cached for a year.
+# The HTML shell and SPA routes must revalidate so a new deploy is picked up at once.
+# /api/* never reaches assets: the Worker answers it, and it sends no-store itself.
+/*
+  Cache-Control: no-cache
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

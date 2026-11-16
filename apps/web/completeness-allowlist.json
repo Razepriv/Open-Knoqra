@@ -1,0 +1,4 @@
+{
+  "_note": "Routes still owned by branches that have not merged. The placeholder check, crawler and axe scan skip them. Integration removes each entry as its branch lands and deletes apps/web/src/components/stub-page.tsx with the last one. An empty list is the Phase 1 goal.",
+  "pending": []
+}

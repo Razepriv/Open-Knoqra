@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Reset links carry a one-time token in the address; never hand it to another site. -->
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content="KNOQRA: calls, texts and contacts in one calm workspace." />
+    <title>KNOQRA</title>
+    <!-- The first link is the fallback for browsers that ignore media on icons. Then the night tile
+         for light browser chrome and the citron tile for dark. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/svg+xml" href="/favicon-light.svg" media="(prefers-color-scheme: dark)" />
+    <script>
+      // Apply a saved theme before first paint. With nothing saved, data-theme stays unset and
+      // the prefers-color-scheme block in tokens.css follows the system. See src/lib/theme.ts.
+      try {
+        const saved = localStorage.getItem('knoqra.theme');
+        if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+      } catch {}
+      // The desktop app shows the Desk as a rounded frame on the page colour; a browser fills the
+      // window. The desktop shell is recognised by its runtime (Electron, Tauri) or by a
+      // KnoqraDesktop/ token in its user agent. See --page-pad in src/styles.css.
+      try {
+        if (/\b(Electron|KnoqraDesktop)\//.test(navigator.userAgent) || '__TAURI_INTERNALS__' in window)
+          document.documentElement.dataset.shell = 'framed';
+      } catch {}
+    </script>
+    <!-- First paint before any script: a CSS-only outline of the shell or the auth layout, in #root,
+         so React's first render replaces it. tokens.css may not be loaded yet, so each colour falls
+         back to its token value (light here, dark below). Sizes follow AppShell and AuthLayout. -->
+    <style>
+      :root{--o-page:#C6CAC3;--o-shell:#ECEEEA;--o-panel:linear-gradient(180deg,#FDFDFC 0%,#F4F5F2 100%);--o-panelBorder:rgba(19,25,22,.07);--o-panelShadow:inset 0 1px 0 rgba(255,255,255,.95),0 18px 40px -30px rgba(19,25,22,.45);--o-cell:#F0F1ED;--o-pill:#FFFFFF;--o-pillBorder:rgba(19,25,22,.09)}
+      [data-theme="dark"]{--o-page:#050606;--o-shell:#0B0D0C;--o-panel:linear-gradient(180deg,#181C1A 0%,#121514 100%);--o-panelBorder:rgba(255,255,255,.07);--o-panelShadow:inset 0 1px 0 rgba(255,255,255,.05),0 24px 44px -26px rgba(0,0,0,.9);--o-cell:#1D2220;--o-pill:#1D2220;--o-pillBorder:rgba(255,255,255,.08)}
+      @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--o-page:#050606;--o-shell:#0B0D0C;--o-panel:linear-gradient(180deg,#181C1A 0%,#121514 100%);--o-panelBorder:rgba(255,255,255,.07);--o-panelShadow:inset 0 1px 0 rgba(255,255,255,.05),0 24px 44px -26px rgba(0,0,0,.9);--o-cell:#1D2220;--o-pill:#1D2220;--o-pillBorder:rgba(255,255,255,.08)}}
+      html{background:var(--shell,var(--o-shell))}
+      html[data-shell="framed"]{background:var(--page,var(--o-page))}
+      body{margin:0}
+      .kq-o{box-sizing:border-box;min-height:100dvh;background:var(--shell,var(--o-shell))}
+      [data-shell="framed"] .kq-o{padding:8px;background:var(--page,var(--o-page))}
+      .kq-o *{box-sizing:border-box}
+      .kq-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+      .kq-canvas{display:flex;flex-direction:column;gap:16px;min-height:100dvh;padding:12px;background:var(--shell,var(--o-shell))}
+      [data-shell="framed"] .kq-canvas{max-width:1440px;min-height:calc(100dvh - 1rem);margin:0 auto;border-radius:28px}
+      .kq-panel{border:1px solid var(--panelBorder,var(--o-panelBorder));border-radius:30px;background:var(--panel,var(--o-panel));box-shadow:var(--panelShadow,var(--o-panelShadow))}
+      .kq-bar{display:block;border-radius:6px;background:var(--cell,var(--o-cell))}
+      .kq-circle{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--pillBorder,var(--o-pillBorder));background:var(--pill,var(--o-pill))}
+      .kq-tile{flex:none;width:46px;height:46px;border-radius:15px;background:var(--cell,var(--o-cell))}
+      .kq-pill{flex:none;height:34px;border-radius:999px;border:1px solid var(--pillBorder,var(--o-pillBorder));background:var(--pill,var(--o-pill))}
+      .kq-grow{flex:1}
+      .kq-frame{display:flex;flex:1;flex-direction:column;gap:16px}
+      .kq-rail{position:sticky;bottom:8px;order:9;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:8px;border-radius:28px}
+      .kq-rail>.kq-tile,.kq-rail>.kq-grow{display:none}
+      .kq-col{display:flex;flex:1;flex-direction:column;gap:16px;min-width:0}
+      .kq-top{display:flex;flex:none;align-items:center;gap:8px;height:62px;padding:0 10px;border-radius:26px}
+      .kq-top .kq-circle{width:42px;height:42px}
+      .kq-top .kq-tile{width:42px;height:42px}
+      .kq-chip{display:none;width:150px;height:42px;border-radius:999px;border:1px solid var(--pillBorder,var(--o-pillBorder));background:var(--pill,var(--o-pill))}
+      .kq-main{flex:1;min-height:320px}
+      .kq-auth{display:none;flex:1;gap:16px}
+      .kq-o.kq-is-auth .kq-frame{display:none}
+      .kq-o.kq-is-auth .kq-auth{display:grid}
+      .kq-hero{display:flex;flex-direction:column;gap:40px;padding:24px}
+      .kq-hero-copy{display:flex;flex:1;flex-direction:column;justify-content:flex-end;gap:24px}
+      .kq-form{display:flex;flex-direction:column;justify-content:center;padding:24px}
+      .kq-form-in{display:flex;flex-direction:column;gap:28px;width:100%;max-width:400px;margin:0 auto}
+      .kq-field{display:block;height:48px;border-radius:16px;border:1px solid var(--panelBorder,var(--o-panelBorder));background:var(--cell,var(--o-cell))}
+      .kq-ln{display:flex;align-items:center}
+      .kq-ln>i{display:block;height:68%;border-radius:6px;background:var(--cell,var(--o-cell))}
+      .kq-fields{display:flex;flex-direction:column;gap:20px}
+      .kq-fld{display:flex;flex-direction:column}
+      .kq-lbl{height:19.5px;margin-bottom:8px}.kq-lbl>i{width:30%}
+      .kq-hint{height:11px;margin-top:8px}.kq-hint>i{width:55%}
+      .kq-link{height:21px;margin-top:-8px}
+      .kq-check{align-items:flex-start;gap:12px}
+      .kq-box{flex:none;width:18px;height:18px;margin-top:3px;border-radius:5px;border:1px solid var(--pillBorder,var(--o-pillBorder));background:var(--cell,var(--o-cell))}
+      .kq-btn{display:block;height:48px;border-radius:999px;background:var(--cell,var(--o-cell))}
+      .kq-after{height:21px}
+      .kq-f2,.kq-f3,.kq-h1,.kq-h3,.kq-link,.kq-check,.kq-after,.kq-t2{display:none}
+      @media (max-width:639px){.kq-r-forgot-password .kq-t2,.kq-r-reset-password .kq-t2,.kq-r-two-factor .kq-t2{display:flex}}
+      .kq-r-sign-in .kq-f2,.kq-r-sign-in .kq-link,.kq-r-sign-up .kq-f2,.kq-r-sign-up .kq-f3,.kq-r-sign-up .kq-h3,.kq-r-reset-password .kq-h1,.kq-r-reset-password .kq-f2,.kq-r-two-factor .kq-h1,.kq-r-two-factor .kq-check,.kq-r-two-factor .kq-after{display:flex}
+      .kq-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+      .kq-stack{display:flex;flex-direction:column;gap:12px}
+      @media (min-width:640px){.kq-canvas{padding:16px}[data-shell="framed"] .kq-o{padding:16px}[data-shell="framed"] .kq-canvas{min-height:calc(100dvh - 2rem);border-radius:36px}.kq-circle{width:46px;height:46px}.kq-chip{display:block}.kq-hero{padding:36px}.kq-form{padding:40px}}
+      @media (min-width:1024px){[data-shell="framed"] .kq-o{padding:24px}[data-shell="framed"] .kq-canvas{min-height:calc(100dvh - 3rem)}.kq-frame{display:grid;grid-template-columns:68px minmax(0,1fr)}.kq-rail{position:sticky;top:16px;bottom:auto;align-self:start;height:calc(100dvh - 2rem);overflow-y:auto;order:0;flex-direction:column;justify-content:flex-start;gap:10px;padding:12px 0;border-radius:34px}.kq-rail>.kq-tile,.kq-rail>.kq-grow{display:block}[data-shell="framed"] .kq-rail{top:40px;height:calc(100dvh - 5rem)}.kq-top .kq-tile{display:none}.kq-o.kq-is-auth .kq-auth{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}}
+    </style>
+  </head>
+  <body>
+    <div id="root"><div id="kq-outline" class="kq-o" data-skeleton="shell"><div class="kq-canvas"><span role="status" class="kq-sr">Loading KNOQRA</span><div class="kq-frame" aria-hidden="true"><div class="kq-rail kq-panel" data-skeleton-part="rail"><span class="kq-tile"></span><span class="kq-grow"></span><span class="kq-circle"></span><span class="kq-circle"></span><span class="kq-circle"></span><span class="kq-circle"></span><span class="kq-circle"></span><span class="kq-circle"></span><span class="kq-grow"></span><span class="kq-circle"></span></div><div class="kq-col"><div class="kq-top kq-panel" data-skeleton-part="top-bar"><span class="kq-tile"></span><span class="kq-bar" style="width:110px;height:18px;margin:0 8px"></span><span class="kq-grow"></span><span class="kq-chip"></span><span class="kq-circle"></span><span class="kq-circle"></span><span class="kq-circle"></span></div><div class="kq-main kq-panel"></div></div></div><div class="kq-auth" aria-hidden="true"><div class="kq-hero kq-panel" data-skeleton-part="auth-hero"><div class="kq-row"><span class="kq-tile"></span><span class="kq-circle" style="width:42px;height:42px"></span></div><div class="kq-hero-copy"><div><span class="kq-ln" style="height:clamp(39.2px,5.488vw,70.56px)"><i style="width:min(100%,30rem)"></i></span><span class="kq-ln" style="height:clamp(39.2px,5.488vw,70.56px)"><i style="width:min(70%,20rem)"></i></span></div><div><span class="kq-ln" style="height:26px"><i style="width:min(100%,26rem)"></i></span><span class="kq-ln" style="height:26px"><i style="width:min(80%,16rem)"></i></span></div><div class="kq-row" style="justify-content:flex-start;gap:8px"><span class="kq-pill" style="width:84px"></span><span class="kq-pill" style="width:70px"></span><span class="kq-pill" style="width:104px"></span></div></div></div><div class="kq-form kq-panel" data-skeleton-part="auth-form"><div class="kq-form-in" data-skeleton-part="auth-form-column"><div class="kq-stack"><span class="kq-ln" style="height:11px"><i style="width:28%"></i></span><div><span class="kq-ln" style="height:30px"><i style="width:64%"></i></span><span class="kq-ln kq-t2" style="height:30px"><i style="width:40%"></i></span></div></div><div class="kq-fields"><div class="kq-fld kq-f1"><span class="kq-ln kq-lbl"><i></i></span><span class="kq-field" data-skeleton-part="field"></span><span class="kq-ln kq-hint kq-h1"><i></i></span></div><div class="kq-fld kq-f2"><span class="kq-ln kq-lbl"><i></i></span><span class="kq-field" data-skeleton-part="field"></span></div><div class="kq-fld kq-f3"><span class="kq-ln kq-lbl"><i></i></span><span class="kq-field" data-skeleton-part="field"></span><span class="kq-ln kq-hint kq-h3"><i></i></span></div><span class="kq-ln kq-link"><i style="width:38%"></i></span><div class="kq-ln kq-check"><span class="kq-box"></span><span class="kq-ln" style="height:19.25px;flex:1"><i style="width:62%"></i></span></div><span class="kq-btn"></span><span class="kq-ln kq-after"><i style="width:52%"></i></span></div><span class="kq-ln" style="height:21px"><i style="width:58%"></i></span></div></div></div></div></div></div>
+    <!-- Content-Security-Policy (M6d): allow this inline script by its hash. -->
+    <script>
+      (() => {
+        var page = location.pathname.replace(/\/+$/, '').slice(1);
+        if (['sign-in', 'sign-up', 'forgot-password', 'reset-password', 'two-factor'].indexOf(page) < 0) return;
+        var outline = document.getElementById('kq-outline');
+        outline.className += ` kq-is-auth kq-r-${page}`;
+        outline.setAttribute('data-skeleton', page);
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

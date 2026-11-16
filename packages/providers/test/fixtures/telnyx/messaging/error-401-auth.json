@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": "10009",
+      "title": "Authentication failed",
+      "detail": "The required authentication headers were either invalid or not included in the request."
+    }
+  ]
+}
