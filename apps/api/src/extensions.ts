@@ -1,5 +1,5 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { Tx } from '@knoqra/db';
+import type { Database, Tx } from '@knoqra/db';
 import type { CronJob } from './cron/jobs';
 import type { NewsletterChange } from './email/newsletter';
 import type { Env } from './env';
@@ -40,6 +40,23 @@ export interface ApiExtension {
    * unsubscribe link), for example to keep a mailing list in step. Errors are logged, never shown.
    */
   newsletterChanged?: (env: Env, change: NewsletterChange) => Promise<void>;
+  /**
+   * Account deletion, before anything is deleted: a workspace is about to close because its only
+   * member deletes their account (account/delete-account.ts). Stop what still bills or renews, for
+   * example cancel a subscription. Throwing stops the deletion with nothing changed. Return
+   * `keepProviderAccess: true` when the workspace's provider credential must stay so numbers can
+   * still be released later.
+   */
+  beforeWorkspaceClose?: (
+    env: Env,
+    db: Database,
+    orgId: string,
+  ) => Promise<{ keepProviderAccess?: boolean } | undefined>;
+  /**
+   * Account deletion, inside the deletion transaction (tenant context set to `orgId`), before the
+   * core removes the workspace's data: the edition removes or anonymises its own tables.
+   */
+  closeWorkspace?: (tx: Tx, orgId: string) => Promise<void>;
 }
 
 /**

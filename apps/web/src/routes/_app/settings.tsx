@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { OutageState } from '../../components/outage';
 import { AboutSection } from '../../components/settings/about-section';
 import { ConnectorsSection } from '../../components/settings/connectors-section';
+import { DeleteAccountSection } from '../../components/settings/delete-account-section';
 import {
   PREFERENCES_SECTION,
   PreferencesSection,
@@ -102,6 +103,7 @@ function Settings() {
             </Reveal>
           )}
           {ExtraSections && me.data ? <ExtraSections me={me.data} /> : null}
+          <DeleteAccountSection />
         </div>
       </div>
       {me.isPending ? (

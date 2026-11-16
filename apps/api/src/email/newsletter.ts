@@ -9,7 +9,7 @@ export interface NewsletterChange {
   name: string;
   subscribed: boolean;
   /** Where the choice was made. */
-  source: 'sign-up' | 'settings' | 'unsubscribe-link';
+  source: 'sign-up' | 'settings' | 'unsubscribe-link' | 'account-deleted';
 }
 
 /**

@@ -178,7 +178,73 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete the signed-in user's account
+         * @description Confirmed with the password. A workspace the user is the only member of is closed: its data is deleted and the payment and ledger records the law requires are kept, anonymised. In a workspace with another owner the data stays and the user leaves. Every session ends.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DeleteAccount"];
+                };
+            };
+            responses: {
+                /** @description The account is deleted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["AccountDeleted"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Wrong password */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The user is the only owner of a workspace other people use */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A subscription could not be cancelled; nothing was deleted */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         /** Update the signed-in user's display name */
@@ -7546,7 +7612,7 @@ export interface components {
             data: null;
             error: {
                 /** @enum {string} */
-                code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid";
+                code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid" | "invalid_password" | "sole_owner_with_members";
                 message: string;
             };
         };
@@ -7574,6 +7640,13 @@ export interface components {
         };
         UpdateProfile: {
             name: string;
+        };
+        AccountDeleted: {
+            /** @enum {boolean} */
+            deleted: true;
+        };
+        DeleteAccount: {
+            password: string;
         };
         LicenseStatus: {
             /** @enum {string} */
@@ -7614,7 +7687,7 @@ export interface components {
                 contactId: string | null;
                 error: {
                     /** @enum {string} */
-                    code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid";
+                    code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid" | "invalid_password" | "sole_owner_with_members";
                     message: string;
                 } | null;
             }[];

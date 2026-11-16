@@ -97,3 +97,70 @@ DO $$ DECLARE t text; BEGIN
       WITH CHECK (organization_id = NULLIF(current_setting('app.org_id', true), ''))$p$, t);
   END LOOP; END $$;
 REVOKE DELETE ON message_attachment, sms_registration FROM knoqra_app;
+
+-- Account deletion (DELETE /api/v1/me): closes a workspace whose only member deletes their account.
+-- SECURITY DEFINER because the app role cannot delete from the append-only tables. It removes the
+-- workspace's data and keeps what tax and accounting law requires: the wallet and ledger (notes
+-- cleared), number quotes and orders, provider usage, balance and reconciliation records, usage
+-- events, and the audit log. Those hang from the organization row, so it stays as an anonymised
+-- "Closed workspace" instead of being deleted. Callable only inside that workspace's tenant
+-- transaction (withTenant sets app.org_id) and only while the closing user is its sole member.
+-- keep_provider_access keeps the provider credential (with the numbers, which carry no personal
+-- data) for an edition that still has to release rented numbers; inbound routing always goes, so
+-- nothing new arrives in the closed workspace.
+CREATE OR REPLACE FUNCTION public.knoqra_close_workspace(org text, keep_provider_access boolean)
+  RETURNS void
+  LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, pg_catalog
+  AS $$
+BEGIN
+  IF org IS NULL OR current_setting('app.org_id', true) IS DISTINCT FROM org THEN
+    RAISE EXCEPTION 'knoqra_close_workspace: call it inside the workspace''s tenant transaction';
+  END IF;
+  IF (SELECT count(*) FROM member WHERE organization_id = org) > 1 THEN
+    RAISE EXCEPTION 'knoqra_close_workspace: the workspace has other members';
+  END IF;
+
+  -- Conversations and everything under them, calls and voicemail, then the contacts' own records.
+  DELETE FROM message_reaction WHERE organization_id = org;
+  DELETE FROM message_attachment WHERE organization_id = org;
+  DELETE FROM message_status_event WHERE organization_id = org;
+  DELETE FROM message WHERE organization_id = org;
+  DELETE FROM conversation WHERE organization_id = org;
+  DELETE FROM voicemail WHERE organization_id = org;
+  DELETE FROM call_event WHERE organization_id = org;
+  DELETE FROM call WHERE organization_id = org;
+  DELETE FROM timeline_event WHERE organization_id = org;
+  DELETE FROM contact_permission_event WHERE organization_id = org;
+  DELETE FROM contact_duplicate_dismissal WHERE organization_id = org;
+  DELETE FROM otto_draft WHERE organization_id = org;
+  DELETE FROM task WHERE organization_id = org;
+  DELETE FROM notification WHERE organization_id = org;
+  DELETE FROM contact WHERE organization_id = org;
+
+  -- Workspace set-up: templates, channels, US texting registrations, setup progress, invitations,
+  -- raw provider events (they hold message text and numbers) and inbound routing.
+  DELETE FROM message_template WHERE organization_id = org;
+  DELETE FROM channel_route WHERE organization_id = org;
+  DELETE FROM channel_connection WHERE organization_id = org;
+  DELETE FROM sms_registration WHERE organization_id = org;
+  DELETE FROM setup_progress WHERE organization_id = org;
+  DELETE FROM invitation WHERE organization_id = org;
+  DELETE FROM provider_event_raw WHERE organization_id = org;
+  DELETE FROM call_route WHERE organization_id = org;
+  DELETE FROM provider_number_route WHERE organization_id = org;
+  IF NOT keep_provider_access THEN
+    DELETE FROM provider_credential WHERE organization_id = org;
+  END IF;
+
+  -- Kept records, anonymised: free-text ledger notes, and the workspace's name and slug (both were
+  -- made from the owner's name and user id).
+  UPDATE ledger_entry SET note = NULL WHERE organization_id = org AND note IS NOT NULL;
+  UPDATE organization
+    SET name = 'Closed workspace',
+        slug = 'closed-' || lower(id),
+        logo = NULL,
+        metadata = json_build_object('closedAt', now())::text
+    WHERE id = org;
+END $$;
+REVOKE ALL ON FUNCTION public.knoqra_close_workspace(text, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.knoqra_close_workspace(text, boolean) TO knoqra_app;

@@ -161,6 +161,7 @@ export function createApp(extensions: readonly ApiExtension[] = []): OpenAPIHono
   // before the route handlers, so a limited dial makes no call row, reserve or lock.
   app.on('POST', ['/api/v1/calls', '/api/v1/calls/:id/answer'], rateLimit(RULES.dial));
   app.on('POST', '/api/v1/voice/token', rateLimit(RULES.voice_token));
+  app.on('DELETE', '/api/v1/me', rateLimit(RULES.account_delete));
   app.on('POST', '/api/v1/conversations/:id/messages', rateLimit(RULES.message_send));
   app.route('/', me);
   app.route('/', licenseRoutes(licenseChecker));

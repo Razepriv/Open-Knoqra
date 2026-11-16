@@ -73,9 +73,11 @@ export const BLOCKED_ORGANIZATION_PATHS: readonly string[] = ORGANIZATION_PLUGIN
 
 /**
  * Core Better Auth paths that are blocked. `/update-user` accepts any `name`: the Desk changes
- * the display name through `PATCH /api/v1/me`, which validates it.
+ * the display name through `PATCH /api/v1/me`, which validates it. Accounts are deleted through
+ * `DELETE /api/v1/me` (account/delete-account.ts), which closes or leaves the user's workspaces in
+ * one transaction; Better Auth's own delete (not enabled here) would only remove the user row.
  */
-const BLOCKED_USER_PATHS = ['/update-user'] as const;
+const BLOCKED_USER_PATHS = ['/update-user', '/delete-user', '/delete-user/callback'] as const;
 
 /** Enforced through Better Auth's `disabledPaths` (answers 404 for any HTTP method). */
 export const BLOCKED_AUTH_PATHS: readonly string[] = [

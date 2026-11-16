@@ -196,7 +196,9 @@
                   "connector_conflict",
                   "rate_unavailable",
                   "license_required",
-                  "license_invalid"
+                  "license_invalid",
+                  "invalid_password",
+                  "sole_owner_with_members"
                 ]
               },
               "message": {
@@ -289,6 +291,27 @@
           }
         },
         "required": ["name"]
+      },
+      "AccountDeleted": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["deleted"]
+      },
+      "DeleteAccount": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "required": ["password"]
       },
       "LicenseStatus": {
         "type": "object",
@@ -443,7 +466,9 @@
                         "connector_conflict",
                         "rate_unavailable",
                         "license_required",
-                        "license_invalid"
+                        "license_invalid",
+                        "invalid_password",
+                        "sole_owner_with_members"
                       ]
                     },
                     "message": {
@@ -4180,6 +4205,87 @@
           },
           "409": {
             "description": "No active organization the user belongs to",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["account"],
+        "summary": "Delete the signed-in user's account",
+        "description": "Confirmed with the password. A workspace the user is the only member of is closed: its data is deleted and the payment and ledger records the law requires are kept, anonymised. In a workspace with another owner the data stays and the user leaves. Every session ends.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account is deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AccountDeleted"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Wrong password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The user is the only owner of a workspace other people use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "A subscription could not be cancelled; nothing was deleted",
             "content": {
               "application/json": {
                 "schema": {

@@ -14,7 +14,7 @@ import { logger } from './logger';
  * counts per isolate only: these bindings are the limit that holds.
  */
 export interface RateLimitRule {
-  name: 'auth' | 'dial' | 'voice_token' | 'message_send';
+  name: 'auth' | 'account_delete' | 'dial' | 'voice_token' | 'message_send';
   binding: (env: Env) => RateLimit | undefined;
   key: (c: Context<AppEnv>) => string;
 }
@@ -121,6 +121,13 @@ export const RULES: Record<RateLimitRule['name'], RateLimitRule> = {
     name: 'auth',
     binding: (env) => env.RL_AUTH,
     key: (c) => `auth:${authRoute(c)}:${addressGroup(clientIp(c.req.raw.headers))}`,
+  },
+  // Account deletion checks the password: limited per user like the sign-in guesses, on the same
+  // binding, so a stolen session cannot be used to guess the password.
+  account_delete: {
+    name: 'account_delete',
+    binding: (env) => env.RL_AUTH,
+    key: (c) => `account-delete:${c.var.tenant.userId}`,
   },
   dial: {
     name: 'dial',

@@ -41,6 +41,8 @@ export const ERROR_CODES = [
   'rate_unavailable',
   'license_required',
   'license_invalid',
+  'invalid_password',
+  'sole_owner_with_members',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
