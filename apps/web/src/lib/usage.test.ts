@@ -53,7 +53,7 @@ describe('copy', () => {
   });
   it('reuses the dialer copy for provider reasons', () => {
     expect(spendBannerCopy({ outcome: 'warn', reason: 'provider_low' })).toBe(
-      'Your Telnyx balance is low. Top it up in Telnyx to keep calling.',
+      'Your phone provider balance is low. Top it up with your provider to keep calling.',
     );
     expect(spendBannerCopy({ outcome: 'stop', reason: 'stop_cap' })).toBe(
       'Spend cap reached. Raise it in the wallet to call.',
@@ -61,8 +61,8 @@ describe('copy', () => {
   });
   it('describes the provider snapshot status', () => {
     expect(providerStatusCopy('ok')).toBe('Connected');
-    expect(providerStatusCopy('auth_failed')).toBe('Telnyx rejected the key');
-    expect(providerStatusCopy('unavailable')).toBe('Telnyx unavailable');
+    expect(providerStatusCopy('auth_failed')).toBe('Your phone provider rejected the key');
+    expect(providerStatusCopy('unavailable')).toBe('Phone provider unavailable');
   });
 });
 

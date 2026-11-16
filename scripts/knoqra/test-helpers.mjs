@@ -172,6 +172,7 @@ export function fakeCloudflare(options = {}) {
     subdomain = 'example-sub',
     hyperdrive = [],
     queues = [],
+    buckets = [],
     tokenOk = true,
     health = { status: 200, body: '{"status":"ok"}' },
   } = options;
@@ -209,6 +210,9 @@ export function fakeCloudflare(options = {}) {
     if (route.startsWith(`PUT ${acc}/hyperdrive/configs/`)) return ok({});
     if (route === `GET ${acc}/queues`) return ok(queues.map((queue_name) => ({ queue_name })));
     if (route === `POST ${acc}/queues`) return ok({});
+    if (route === `GET ${acc}/r2/buckets`)
+      return ok({ buckets: buckets.map((name) => ({ name })) });
+    if (route === `POST ${acc}/r2/buckets`) return ok({});
     return json(404, { success: false, errors: [{ code: 7003, message: `No route ${route}` }] });
   };
   return { fetch, requests };

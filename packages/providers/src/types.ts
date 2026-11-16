@@ -1,4 +1,4 @@
-import type { Result, TenDlcState, WhatsAppState } from '@knoqra/core';
+import type { AttachmentKind, Result, TenDlcState, WhatsAppState } from '@knoqra/core';
 
 export interface SessionInput {
   orgId: string;
@@ -48,7 +48,34 @@ export interface AuthorizedWhatsAppRequest {
   templateId?: string;
   /** An approved Meta template, sent by name and language with body parameters in order. */
   template?: WhatsAppTemplateRef;
+  /** One file, fetched by the provider from `link`; `body` becomes its caption where allowed. */
+  media?: OutboundMedia;
+  /** The channel id (WhatsApp wamid) of the message this one replies to. */
+  replyTo?: string;
   idempotencyKey: string;
+}
+export interface OutboundMedia {
+  kind: Exclude<AttachmentKind, 'sticker'>;
+  /** A public https URL the provider fetches the file from. */
+  link: string;
+  fileName?: string;
+}
+export interface AuthorizedWhatsAppReaction {
+  orgId: string;
+  from: string;
+  to: string;
+  /** The channel id (WhatsApp wamid) of the message reacted to. */
+  targetChannelMessageId: string;
+  /** An emoji, or empty to remove the reaction. */
+  emoji: string;
+  idempotencyKey: string;
+}
+/** A downloaded inbound file. */
+export interface FetchedMedia {
+  body: ReadableStream<Uint8Array>;
+  contentType: string;
+  /** The byte length, when the provider said. */
+  size: number | null;
 }
 export interface WhatsAppTemplateRef {
   name: string;
@@ -74,6 +101,13 @@ export interface ProviderNumber {
   capabilities: { voice: boolean; sms: boolean; mms: boolean; whatsapp: boolean };
   tenDlc: TenDlcState;
   whatsapp: WhatsAppState;
+  /**
+   * False when the provider's WhatsApp facts could not be read this time (an outage, not a missing
+   * product): the sync then keeps the WhatsApp columns it already has. Absent means read.
+   */
+  whatsappSynced?: boolean;
+  /** WhatsApp's display name and quality rating for a WhatsApp number, when known. */
+  whatsappDetail?: { displayName: string | null; qualityRating: string | null };
 }
 
 export interface NumbersProvider {
@@ -146,6 +180,15 @@ export interface BalanceProvider {
 export interface MessagingProvider {
   sendSms(input: AuthorizedSmsRequest): Promise<ProviderMessage>;
   sendWhatsApp(input: AuthorizedWhatsAppRequest): Promise<ProviderMessage>;
+  /** Reacts to (or, with an empty emoji, un-reacts to) a WhatsApp message. */
+  sendWhatsAppReaction?(input: AuthorizedWhatsAppReaction): Promise<ProviderMessage>;
+  /** Downloads an inbound WhatsApp file by its hosted URL or its media id. */
+  fetchWhatsAppMedia?(input: {
+    businessNumber: string;
+    url?: string;
+    mediaId?: string;
+    maxBytes: number;
+  }): Promise<FetchedMedia>;
 }
 
 export type ProviderEventType =

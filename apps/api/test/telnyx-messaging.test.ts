@@ -231,10 +231,8 @@ async function telnyxSender(org: Org, channel: Channel): Promise<string> {
     {
       method: 'PUT',
       headers: { 'content-type': 'application/json', cookie: org.cookie },
-      // WhatsApp's status is the owner's until M4's sync reads Meta (ruling AR).
-      body: JSON.stringify(
-        channel === 'whatsapp' ? { address, registrationStatus: 'approved' } : { address },
-      ),
+      // Both channels take the synced number's status (seedSyncedNumber: registered, approved).
+      body: JSON.stringify({ address }),
     },
   );
   expect(r.status).toBe(200);
@@ -628,18 +626,15 @@ describe('live gate', () => {
     });
   });
 
-  it('pauses with live_disabled when the channel flag is unset', async () => {
+  it('ignores the retired channel flags: the registration status decides', async () => {
     const { org, t } = await gatedOrg('gate-noflag', { credential: true });
     const noFlag = { ...liveEnv, SMS_10DLC_APPROVED: undefined } as Env;
-    expect(await composerOf(org, t.conversationId, noFlag)).toMatchObject({
-      mode: 'paused',
-      reason: 'live_disabled',
-    });
-    const notTrue = { ...liveEnv, SMS_10DLC_APPROVED: 'yes' } as Env;
-    expect((await composerOf(org, t.conversationId, notTrue))?.reason).toBe('live_disabled');
+    expect(await composerOf(org, t.conversationId, noFlag)).toMatchObject({ mode: 'free' });
+    const notTrue = { ...liveEnv, SMS_10DLC_APPROVED: 'no' } as Env;
+    expect((await composerOf(org, t.conversationId, notTrue))?.mode).toBe('free');
   });
 
-  it('is free with a credential, the flag and an approved registration', async () => {
+  it('is free with a credential and an approved registration', async () => {
     const { org, t } = await gatedOrg('gate-free', { credential: true });
     expect(await composerOf(org, t.conversationId, liveEnv)).toMatchObject({ mode: 'free' });
   });

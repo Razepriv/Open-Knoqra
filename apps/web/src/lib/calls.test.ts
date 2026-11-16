@@ -177,10 +177,10 @@ describe('unreadCount', () => {
 describe('provider balance spend copy', () => {
   it('explains a low or exhausted Telnyx balance when a call is blocked', () => {
     expect(callErrorCopy('spend_blocked', 'provider_low')).toBe(
-      'Your Telnyx balance is low. Top it up in Telnyx to keep calling.',
+      'Your phone provider balance is low. Top it up with your provider to keep calling.',
     );
     expect(callErrorCopy('spend_blocked', 'provider_exhausted')).toBe(
-      'Your Telnyx balance is too low to place a call. Top it up in Telnyx.',
+      'Your phone provider balance is too low to place a call. Top it up with your provider.',
     );
   });
 });
@@ -200,10 +200,10 @@ describe('spendNoteCopy', () => {
 
   it('shows the Telnyx copy, not the cap copy, for the provider reasons', () => {
     expect(spendNoteCopy('warn', 'provider_low')).toBe(
-      'Your Telnyx balance is low. Top it up in Telnyx to keep calling.',
+      'Your phone provider balance is low. Top it up with your provider to keep calling.',
     );
     expect(spendNoteCopy('stop', 'provider_exhausted')).toBe(
-      'Your Telnyx balance is too low to place a call. Top it up in Telnyx.',
+      'Your phone provider balance is too low to place a call. Top it up with your provider.',
     );
   });
 });

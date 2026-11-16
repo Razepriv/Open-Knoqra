@@ -1,0 +1,40 @@
+{
+  "data": [
+    {
+      "record_type": "whatsapp_business_phone_number",
+      "phone_number": "+12025550100",
+      "phone_number_id": "100000000000001",
+      "waba_id": "200000000000001",
+      "user_id": "00000000-0000-4000-8000-00000000a001",
+      "display_name": "Example Repairs",
+      "quality_rating": "GREEN",
+      "status": "CONNECTED",
+      "created_at": "2026-11-15T10:00:00Z",
+      "enabled": true,
+      "calling_enabled": false,
+      "is_on_biz_app": false,
+      "coexistence_state": null
+    },
+    {
+      "record_type": "whatsapp_business_phone_number",
+      "phone_number": "+12025550101",
+      "phone_number_id": "100000000000002",
+      "waba_id": "200000000000002",
+      "user_id": "00000000-0000-4000-8000-00000000a001",
+      "display_name": "Example Repairs East",
+      "quality_rating": "NA",
+      "status": "PENDING",
+      "created_at": "2026-11-15T10:00:00Z",
+      "enabled": true,
+      "calling_enabled": false,
+      "is_on_biz_app": false,
+      "coexistence_state": null
+    }
+  ],
+  "meta": {
+    "total_pages": 1,
+    "total_results": 2,
+    "page_number": 1,
+    "page_size": 250
+  }
+}

@@ -43,7 +43,9 @@ function SyncError({ error }: { error: unknown }) {
     );
   }
   const message =
-    error instanceof ApiError ? error.message : 'Could not sync your numbers from Telnyx.';
+    error instanceof ApiError
+      ? error.message
+      : 'Could not sync your numbers from your phone provider.';
   return <FormAlert message={message} />;
 }
 
@@ -85,7 +87,7 @@ export function NumberStep({ onDone }: { onDone: () => void }) {
           disabled={sync.isPending}
         >
           <RefreshCw size={15} strokeWidth={1.75} aria-hidden="true" />
-          {sync.isPending ? 'Syncing…' : 'Sync from Telnyx'}
+          {sync.isPending ? 'Syncing…' : 'Sync numbers'}
         </Button>
         {canBuy ? (
           <Button
@@ -121,7 +123,7 @@ export function NumberStep({ onDone }: { onDone: () => void }) {
       ) : null}
       {items.length === 0 ? (
         <p className="max-w-[52ch] text-[14px] text-[color:var(--muted)] leading-relaxed">
-          No numbers yet. Sync from Telnyx to load the numbers on your account, or get a new one.
+          No numbers yet. Sync to load the numbers on your account, or get a new one.
         </p>
       ) : (
         <fieldset className="flex flex-col gap-2">

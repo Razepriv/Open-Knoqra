@@ -17,6 +17,7 @@ import { ensureConversation, insertMessage } from '../src/messaging/store';
 import { handleProviderEvents } from '../src/queue/consumer';
 import { ingestWebhook } from '../src/routes/webhooks';
 import { api, get, post, signUp, uniqueEmail, withAdminDb, withAppDb } from './helpers';
+import { eventually } from './messaging-helpers';
 
 type Envelope<T> = { data: T | null; error: { code: string; message: string } | null };
 type Msg = {
@@ -255,8 +256,8 @@ describe('free SMS', () => {
     const t = await thread(orgA);
     const r = await sendText(orgA, t.conversationId, 'Your table is ready');
     expect(r.status).toBe(201);
-    const sent = r.body.data as Msg;
-    expect(sent).toMatchObject({
+    const queued = r.body.data as Msg;
+    expect(queued).toMatchObject({
       conversationId: t.conversationId,
       channel: 'sms',
       direction: 'outbound',
@@ -266,6 +267,13 @@ describe('free SMS', () => {
       error: null,
       authorUserId: orgA.userId,
     });
+    // The route answers once the message is stored; the provider send lands after the response.
+    const sent = (
+      await eventually(
+        () => messageDetail(orgA, queued.id),
+        (d) => d.body.data?.providerMessageId != null,
+      )
+    ).body.data as Msg;
     expect(sent.providerMessageId).toMatch(/^fake_msg_/);
 
     const conv = (await (

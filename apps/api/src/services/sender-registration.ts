@@ -1,11 +1,16 @@
-import type { MessagingChannel, RegistrationStatus, TenDlcState } from '@knoqra/core';
+import type {
+  MessagingChannel,
+  RegistrationStatus,
+  TenDlcState,
+  WhatsAppState,
+} from '@knoqra/core';
 import type { PhoneNumberRow } from '@knoqra/db';
 
 /**
- * How M4's synced number facts become an M3 sender's `registration_status` (rulings AQ and AR).
- * This sits next to setup-facts.ts on purpose: for SMS the phone_number row stays the one source
- * of the 10DLC state, and `gatherSetupFacts` keeps reading it unchanged (ruling R9). WhatsApp is
- * the exception until M4's sync reads Meta's state from Telnyx: an owner or admin sets it.
+ * How synced number facts become a sender's `registration_status`. The phone_number row is the one
+ * source of truth for both channels: the 10DLC state for SMS (ruling AQ, ruling R9), and since the
+ * messaging upgrade Meta's approval for WhatsApp, which the Telnyx sync now reads from Telnyx's
+ * WhatsApp number and business account lists (it replaced the owner's dropdown, ruling AR).
  */
 const FROM_TEN_DLC: Record<TenDlcState, RegistrationStatus> = {
   registered: 'approved',
@@ -21,8 +26,30 @@ export function smsRegistration(row: Pick<PhoneNumberRow, 'tenDlcStatus'>): Regi
   return FROM_TEN_DLC[row.tenDlcStatus];
 }
 
-/** Whether the channel's registration status comes from the synced number (else the owner's). */
-export const registrationIsSynced = (channel: MessagingChannel): boolean => channel === 'sms';
+const FROM_WHATSAPP: Record<WhatsAppState, RegistrationStatus> = {
+  approved: 'approved',
+  pending: 'pending',
+  rejected: 'rejected',
+  none: 'not_started',
+};
+
+/** The WhatsApp sender registration status Meta's verdict on the synced number gives. */
+export function whatsappRegistration(
+  row: Pick<PhoneNumberRow, 'whatsappStatus'>,
+): RegistrationStatus {
+  return FROM_WHATSAPP[row.whatsappStatus];
+}
+
+/** The registration status a synced number gives a sender on the channel. */
+export function registrationFor(
+  row: Pick<PhoneNumberRow, 'tenDlcStatus' | 'whatsappStatus'>,
+  channel: MessagingChannel,
+): RegistrationStatus {
+  return channel === 'sms' ? smsRegistration(row) : whatsappRegistration(row);
+}
+
+/** Whether the channel's registration status comes from the synced number: both channels now. */
+export const registrationIsSynced = (_channel: MessagingChannel): boolean => true;
 
 export type Sendable = 'ok' | 'not_synced' | 'not_capable';
 
@@ -36,12 +63,12 @@ export const isActiveSynced = (row: SendableRow | undefined): row is SendableRow
   row?.provider === 'telnyx' && row.status === 'active';
 
 /**
- * Whether a synced number may be a live sender on the channel. SMS needs the number's SMS
- * capability. WhatsApp needs any capability (ruling AR): M4's Telnyx sync never reports WhatsApp,
- * so its `whatsapp: false` is not evidence. `undefined` is a number the last sync did not list.
+ * Whether a synced number may be a live sender on the channel: SMS needs the number's SMS
+ * capability, WhatsApp its WhatsApp one (the Telnyx sync lists the account's WhatsApp numbers).
+ * `undefined` is a number the last sync did not list.
  */
 export function sendableFor(row: SendableRow | undefined, channel: MessagingChannel): Sendable {
   if (!isActiveSynced(row)) return 'not_synced';
-  const capable = channel === 'sms' ? row.sms : row.voice || row.sms || row.mms || row.whatsapp;
+  const capable = channel === 'sms' ? row.sms : row.whatsapp;
   return capable ? 'ok' : 'not_capable';
 }

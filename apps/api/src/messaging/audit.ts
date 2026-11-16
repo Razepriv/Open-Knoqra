@@ -12,11 +12,23 @@ export type MessagingAuditAction =
   | 'template.approve'
   | 'template.reset_approval'
   | 'sandbox.update'
-  | 'sender.update';
+  | 'sender.update'
+  | 'attachment.upload'
+  | 'reaction.send'
+  | 'sms_registration.submit'
+  | 'sms_registration.otp'
+  | 'whatsapp.sync'
+  | 'whatsapp.signup';
 
 export interface MessagingAuditInput {
   action: MessagingAuditAction;
-  entityType: 'conversation' | 'message' | 'message_template' | 'channel_connection';
+  entityType:
+    | 'conversation'
+    | 'message'
+    | 'message_template'
+    | 'channel_connection'
+    | 'message_attachment'
+    | 'sms_registration';
   outcome: AuditOutcome;
   entityId?: string | null;
   /** Never message bodies or phone numbers. */

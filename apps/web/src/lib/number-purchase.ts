@@ -121,7 +121,8 @@ export function usePurchaseNumber() {
   });
 }
 
-export const ORDER_FAILED_COPY = "Telnyx couldn't complete this order. Nothing was charged.";
+export const ORDER_FAILED_COPY =
+  "Your phone provider couldn't complete this order. Nothing was charged.";
 export const ORDER_PENDING_COPY =
   "Your number is being set up. It appears in Numbers as Pending and is assigned automatically once it's active.";
 
@@ -151,11 +152,14 @@ export function purchaseFailure(error: unknown): PurchaseFailure {
     case 'quote_invalid':
       return { message: server ?? 'This price is no longer valid.', searchAgain: true };
     case 'voice_not_configured':
-      return { message: 'Connect Telnyx before buying a number.', searchAgain: false };
+      return { message: 'Connect your phone provider before buying a number.', searchAgain: false };
     case 'forbidden':
       return { message: 'Only the workspace owner can buy numbers.', searchAgain: false };
     case 'provider_unavailable':
-      return { message: 'Telnyx did not answer. Try again in a minute.', searchAgain: false };
+      return {
+        message: 'Your phone provider did not answer. Try again in a minute.',
+        searchAgain: false,
+      };
     default:
       return { message: 'Something went wrong. Try again in a moment.', searchAgain: false };
   }

@@ -6,6 +6,7 @@ import { focusRing, iconPill } from '../../lib/ui-classes';
 import { useDebouncedValue } from '../../lib/use-debounced-value';
 import { useLoadMoreOnScroll } from '../../lib/use-load-more';
 import { useNow } from '../../lib/use-now';
+import { ChannelsBar } from './channels-bar';
 import { InboxLoadError, NoSenders, NoThreads } from './inbox-empty';
 import { ThreadRowsSkeleton } from './inbox-skeletons';
 import { NewThreadDialog } from './new-thread-dialog';
@@ -90,6 +91,7 @@ export function ThreadList({
           New message
         </Button>
       </div>
+      <ChannelsBar />
 
       <fieldset
         aria-label="Filter conversations"

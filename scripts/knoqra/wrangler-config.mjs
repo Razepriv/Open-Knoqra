@@ -46,6 +46,21 @@ export function queueNames(apiBase) {
   return names;
 }
 
+/** The R2 bucket names the base API config binds (message attachments), in order. */
+export function bucketNames(apiBase) {
+  const names = [];
+  for (const b of apiBase.r2_buckets ?? []) {
+    if (
+      typeof b.bucket_name === 'string' &&
+      b.bucket_name !== '' &&
+      !names.includes(b.bucket_name)
+    ) {
+      names.push(b.bucket_name);
+    }
+  }
+  return names;
+}
+
 /**
  * The API Worker's self-host config.
  * @param {object} base      parsed apps/api/wrangler.jsonc

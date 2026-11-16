@@ -56,13 +56,13 @@ function SearchError({ error }: { error: unknown }) {
   if (error instanceof ApiError && error.code === 'voice_not_configured') {
     return (
       <p role="alert" className="text-[14px] text-[color:var(--danger-text)] leading-snug">
-        Connect Telnyx before buying a number.{' '}
+        Connect your phone provider before buying a number.{' '}
         <Link
           to="/setup"
           search={{ step: 'connect' }}
           className="text-[color:var(--text)] underline underline-offset-4"
         >
-          Go to Connect Telnyx
+          Go to setup
         </Link>
       </p>
     );
@@ -71,7 +71,7 @@ function SearchError({ error }: { error: unknown }) {
     return <FormAlert message="Only the workspace owner can buy numbers." />;
   }
   if (error instanceof ApiError && error.code === 'provider_unavailable') {
-    return <FormAlert message="Telnyx did not answer. Try again in a minute." />;
+    return <FormAlert message="Your phone provider did not answer. Try again in a minute." />;
   }
   return <FormAlert message="Could not search for numbers. Try again in a moment." />;
 }

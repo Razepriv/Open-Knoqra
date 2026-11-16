@@ -104,27 +104,27 @@ function pausedCopy(channel: InboxChannel, reason: ComposerState['reason']): Cop
     case 'registration_pending':
       return channel === 'sms'
         ? {
-            title: 'SMS sending paused · 10DLC',
-            body: 'Inbound SMS is received and kept. Outbound starts when 10DLC is approved.',
+            title: 'SMS sending paused · registration',
+            body: 'Inbound SMS is received and kept. Sending starts when your US texting registration is approved. Check it under Channels.',
           }
         : {
-            title: 'WhatsApp sending paused · Meta approval',
-            body: 'Inbound WhatsApp is received and kept. Outbound starts when Meta approves your business.',
+            title: 'WhatsApp sending paused · approval',
+            body: 'Inbound WhatsApp is received and kept. Sending starts when Meta approves your WhatsApp Business number.',
           };
     case 'registration_rejected':
       return {
         title: 'Registration rejected',
-        body: 'Fix the registration in Numbers before sending.',
+        body: `The ${name} registration was not approved. See Channels for what to fix.`,
       };
     case 'live_disabled':
       return {
         title: 'Live sending is off',
-        body: 'Sending stays off until US texting registration (SMS) or WhatsApp approval is confirmed.',
+        body: 'Connect your phone provider in Settings to send for real.',
       };
     default:
       return {
-        title: `No ${name} sender connected`,
-        body: 'Connect a number in Numbers to send. Inbound replies still arrive.',
+        title: `${name} isn't enabled yet`,
+        body: `Enable ${name} under Channels to send. Inbound replies still arrive.`,
       };
   }
 }
@@ -172,14 +172,14 @@ export function composerCopy(channel: InboxChannel, composer: ComposerState): Co
 }
 
 /**
- * Where the composer points when it cannot send: live sending starts with the Telnyx connection,
- * which is set up in the Voice section of Settings (`/numbers` is still a stub).
+ * Where the composer points when it cannot send: live sending starts with the phone provider
+ * connection, which is set up in the Voice section of Settings.
  */
 export function composerLink(
   composer: ComposerState,
 ): { label: string; to: '/settings'; hash: 'voice-heading' } | null {
   return composer.mode === 'paused' && composer.reason === 'live_disabled'
-    ? { label: 'Set up live sending', to: '/settings', hash: 'voice-heading' }
+    ? { label: 'Connect your phone provider', to: '/settings', hash: 'voice-heading' }
     : null;
 }
 
@@ -237,16 +237,16 @@ const LIVE_SENDER_COPY: Record<number, string> = {
 };
 
 /**
- * Who decides a live sender's registration status. SMS follows the 10DLC state in Numbers.
- * WhatsApp is set by the owner until the Numbers sync can read Meta's approval (ruling AR).
+ * Who decides a live sender's registration status: nobody here. Both channels follow the phone
+ * provider (US texting registration for SMS, Meta's approval for WhatsApp), read by the sync.
  */
 export function liveSenderStatus(channel: InboxChannel): { settable: boolean; note: string } {
   return channel === 'whatsapp'
-    ? {
-        settable: true,
-        note: 'Set it to Approved once WhatsApp approves this number.',
-      }
-    : { settable: false, note: 'Registration status comes from Numbers.' };
+    ? { settable: false, note: 'Approval comes from your phone provider, checked automatically.' }
+    : {
+        settable: false,
+        note: 'Registration status comes from your phone provider, checked automatically.',
+      };
 }
 
 /** The refusals that are not a missing connection, told apart by the API's error code. */
@@ -279,3 +279,38 @@ export function threadDayGroups<T extends { occurredAt: string }>(
     label: group.label.toUpperCase(),
   }));
 }
+
+/** "1.2 MB", "340 KB", "12 B": a file size as the Inbox shows it. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
+}
+
+/** "0:07", "12:30": a recording's length or position, in minutes and seconds. */
+export function formatDuration(seconds: number): string {
+  const whole = Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : 0;
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+/** Words for a message whose only content is a file, used in reply quotes. */
+export const ATTACHMENT_WORDS: Record<string, string> = {
+  image: 'Photo',
+  audio: 'Audio',
+  voice: 'Voice message',
+  video: 'Video',
+  document: 'Document',
+  sticker: 'Sticker',
+};
+
+/** A reply quote's line: the quoted text, else what it carried. */
+export function quoteText(quote: { body: string; attachmentKind: string | null }): string {
+  const text = quote.body.trim();
+  if (text) return text;
+  return quote.attachmentKind
+    ? (ATTACHMENT_WORDS[quote.attachmentKind] ?? 'Attachment')
+    : 'Message';
+}
+
+/** The emojis offered for a quick reaction. */
+export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;

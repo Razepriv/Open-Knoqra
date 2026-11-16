@@ -171,7 +171,7 @@ export function BalanceCardsSkeleton() {
         </div>
       </Panel>
       <Panel className="flex flex-col gap-4 p-5 sm:p-6">
-        <Slot height={22} width={160} label="Loading Telnyx balance" />
+        <Slot height={22} width={160} label="Loading provider balance" />
         {figure(true)}
       </Panel>
     </div>

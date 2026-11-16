@@ -16,6 +16,7 @@ export * from './prefs';
 export * from './provider-event';
 export * from './routing';
 export * from './setup';
+export * from './sms-registration';
 export * from './task';
 export * from './timeline';
 export * from './today-prefs';

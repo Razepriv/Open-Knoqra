@@ -135,8 +135,8 @@ export function reconciliationStatusLabel(status: ReconciliationReport['status']
 
 const PROVIDER_STATUS_COPY = {
   ok: 'Connected',
-  auth_failed: 'Telnyx rejected the key',
-  unavailable: 'Telnyx unavailable',
+  auth_failed: 'Your phone provider rejected the key',
+  unavailable: 'Phone provider unavailable',
 } as const satisfies Record<NonNullable<ProviderSnapshot>['status'], string>;
 
 export function providerStatusCopy(status: NonNullable<ProviderSnapshot>['status']): string {
@@ -167,7 +167,7 @@ export function useRefreshBalance() {
     mutationFn: async (): Promise<UsageBalance> =>
       throwIfFailed(
         await api.POST('/api/v1/usage/balance/refresh'),
-        'Could not refresh the Telnyx balance.',
+        'Could not refresh the provider balance.',
       ),
     onSuccess: (balance) => {
       queryClient.setQueryData(usageBalanceKey, balance);

@@ -147,7 +147,7 @@ export function disconnectVoiceOptions(
       if (result.response.status !== 204) {
         throw new ApiError(
           result.response.status,
-          'Could not disconnect Telnyx.',
+          'Could not disconnect your phone provider.',
           (result.error as { error?: { code?: string } } | undefined)?.error?.code,
         );
       }

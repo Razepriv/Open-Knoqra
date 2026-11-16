@@ -21,6 +21,7 @@ import {
 } from '../lib/cursor';
 import { errorResponse, fail, ok, okEnvelope } from '../lib/envelope';
 import { safeText } from '../lib/schemas';
+import { loadMessageExtras } from '../messaging/attachments';
 import { auditMessagingAlone, insertMessagingAudit } from '../messaging/audit';
 import { composerFor } from '../messaging/composer';
 import {
@@ -28,6 +29,9 @@ import {
   ConversationDetailSchema,
   ConversationSchema,
   composerJson,
+  isReplyable,
+  type MessageExtras,
+  NO_EXTRAS,
   type ThreadItemJson,
   ThreadItemSchema,
 } from '../messaging/json';
@@ -273,11 +277,14 @@ interface ThreadRow extends Record<string, unknown> {
   author_name: string | null;
   provider_message_id: string | null;
   status_updated_key: string | null;
+  client_message_id: string | null;
+  reply_to_message_id: string | null;
+  channel_message_id: string | null;
 }
 
 const toIso = (key: string): string => new Date(key).toISOString();
 
-function threadItemJson(row: ThreadRow): ThreadItemJson {
+function threadItemJson(row: ThreadRow, extras: MessageExtras = NO_EXTRAS): ThreadItemJson {
   if (row.kind === 'note') {
     return {
       kind: 'note',
@@ -304,8 +311,15 @@ function threadItemJson(row: ThreadRow): ThreadItemJson {
       error: row.error_code ? { code: row.error_code, message: row.error_message ?? '' } : null,
       authorUserId: row.author_user_id,
       providerMessageId: row.provider_message_id,
+      clientMessageId: row.client_message_id,
       occurredAt: toIso(row.occurred_key),
       statusUpdatedAt: toIso(row.status_updated_key ?? row.occurred_key),
+      ...extras,
+      replyable: isReplyable({
+        channel: row.channel as string,
+        direction: row.direction as string,
+        channelMessageId: row.channel_message_id,
+      }),
     },
   };
 }
@@ -336,7 +350,8 @@ async function threadPage(
       (select 'message'::text as kind, m.id, m.occurred_at, ${keyed('m.occurred_at')} as occurred_key,
         m.conversation_id, m.channel, m.direction, m.body, m.template_id, t.name as template_name,
         m.status, m.error_code, m.error_message, m.author_user_id, null::text as author_name,
-        m.provider_message_id, ${keyed('m.status_updated_at')} as status_updated_key
+        m.provider_message_id, ${keyed('m.status_updated_at')} as status_updated_key,
+        m.client_message_id, m.reply_to_message_id, m.channel_message_id
       from message m
       left join message_template t on t.id = m.template_id and t.organization_id = m.organization_id
       where m.conversation_id = ${conversationId} ${before('m')}
@@ -346,7 +361,7 @@ async function threadPage(
       (select 'note'::text, te.id, te.occurred_at, ${keyed('te.occurred_at')},
         null, null, null, te.body, null, null,
         null, null, null, te.actor_user_id, u.name,
-        null, null
+        null, null, null, null, null
       from timeline_event te
       left join "user" u on u.id = te.actor_user_id
       where te.kind = 'note' and te.ref_type = 'conversation' and te.ref_id = ${conversationId}
@@ -512,18 +527,36 @@ export const conversations = new OpenAPIHono<AppEnv>()
     const query = c.req.valid('query');
     const cursor = parseCursor(query.cursor);
     if (!cursor.ok) return fail(c, 400, 'validation_error', 'Invalid cursor');
-    const rows = await withTenant(db, tenant.orgId, async (tx) => {
+    const found = await withTenant(db, tenant.orgId, async (tx) => {
       if (!(await loadConversation(tx, id))) return undefined;
-      return threadPage(tx, id, query.limit, cursor.value);
+      const rows = await threadPage(tx, id, query.limit, cursor.value);
+      const messages = rows.slice(0, query.limit).filter((r) => r.kind === 'message');
+      const replies = new Map(
+        messages
+          .filter((r) => r.reply_to_message_id)
+          .map((r) => [r.id, r.reply_to_message_id as string] as const),
+      );
+      const extras = await loadMessageExtras(
+        tx,
+        c.env,
+        messages.map((r) => r.id),
+        replies,
+      );
+      return { rows, extras };
     });
-    if (!rows) return notFoundResponse(c, db, tenant, 'conversation.read', id);
+    if (!found) return notFoundResponse(c, db, tenant, 'conversation.read', id);
+    const { rows, extras } = found;
     const page = rows.slice(0, query.limit);
     const last = page.at(-1);
     const nextCursor =
       rows.length > query.limit && last
         ? encodeTimelineCursor({ occurredAt: last.occurred_key, id: last.id })
         : null;
-    return ok(c, { items: page.map(threadItemJson), nextCursor }, 200);
+    return ok(
+      c,
+      { items: page.map((row) => threadItemJson(row, extras.get(row.id))), nextCursor },
+      200,
+    );
   })
   .openapi(noteRoute, async (c) => {
     const { db, tenant } = c.var;

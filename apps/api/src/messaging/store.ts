@@ -1,7 +1,9 @@
 import {
+  type AttachmentKind,
   currentPermissions,
   type MessageStatus,
   type MessagingChannel,
+  messagePreviewText,
   nextStatus,
 } from '@knoqra/core';
 import {
@@ -87,6 +89,14 @@ export interface InsertMessageInput {
   templateId?: string | null;
   authorUserId?: string | null;
   occurredAt: Date;
+  /** The channel's own id (WhatsApp's wamid). */
+  channelMessageId?: string | null;
+  /** The message this one replies to, in the same conversation. */
+  replyToMessageId?: string | null;
+  /** An outbound message's provider request, sent after the response (send.ts). */
+  dispatchPayload?: unknown;
+  /** The kind of file the message carries, for the preview and the timeline. */
+  attachmentKind?: AttachmentKind | null;
 }
 
 /**
@@ -115,9 +125,13 @@ export async function insertMessage(tx: Tx, input: InsertMessageInput): Promise<
       clientMessageId: input.clientMessageId ?? null,
       authorUserId: input.authorUserId ?? null,
       occurredAt: input.occurredAt,
+      channelMessageId: input.channelMessageId ?? null,
+      replyToMessageId: input.replyToMessageId ?? null,
+      dispatchPayload: input.dispatchPayload ?? null,
     })
     .returning();
   if (!row) throw new Error('message insert returned no row');
+  const preview = messagePreviewText(input.body, input.attachmentKind ?? null);
 
   const latest = await isLatestMessage(tx, conv.id, row.id);
   const inbound = input.direction === 'inbound';
@@ -127,7 +141,7 @@ export async function insertMessage(tx: Tx, input: InsertMessageInput): Promise<
       lastActivityAt: sql`greatest(${conversation.lastActivityAt}, ${input.occurredAt})`,
       ...(latest
         ? {
-            lastMessagePreview: firstChars(input.body, PREVIEW_CHARS),
+            lastMessagePreview: firstChars(preview, PREVIEW_CHARS),
             lastMessageDirection: input.direction,
             lastMessageStatus: input.status,
           }
@@ -146,7 +160,7 @@ export async function insertMessage(tx: Tx, input: InsertMessageInput): Promise<
     contactId: conv.contactId,
     kind: 'message',
     title: `${inbound ? 'Inbound' : 'Outbound'} ${CHANNEL_LABELS[conv.channel]}`,
-    body: firstChars(input.body, TIMELINE_BODY_CHARS),
+    body: firstChars(preview, TIMELINE_BODY_CHARS),
     actorUserId: input.authorUserId ?? null,
     source: inbound ? 'provider' : 'app',
     refType: 'message',
@@ -315,7 +329,7 @@ async function recordReportedOptOut(tx: Tx, current: MessageRow): Promise<void> 
       channel,
       status: 'opted_out',
       source: 'system',
-      evidence: 'Telnyx reported an opt-out',
+      evidence: 'The phone provider reported an opt-out',
       actorUserId: null,
       createdAt: sql`clock_timestamp()` as unknown as Date,
     })
@@ -325,7 +339,7 @@ async function recordReportedOptOut(tx: Tx, current: MessageRow): Promise<void> 
     organizationId,
     contactId,
     kind: 'consent',
-    title: `${CHANNEL_LABELS[channel]} opted out (reported by Telnyx)`,
+    title: `${CHANNEL_LABELS[channel]} opted out (reported by the phone provider)`,
     source: 'provider',
     refType: 'contact_permission_event',
     refId: event.id,
@@ -382,14 +396,16 @@ export async function recordProviderResult(
   if (result.ok) {
     await tx
       .update(message)
-      .set({ providerMessageId: result.providerMessageId })
+      .set({ providerMessageId: result.providerMessageId, dispatchPayload: null })
       .where(and(eq(message.id, messageId), isNull(message.providerMessageId)));
     return;
   }
+  // Locks first (contact before message for an opt-out), then any write to the message.
   const current =
     result.failure?.code === 'opted_out'
       ? await lockForOptOut(tx, messageId)
       : await lockMessage(tx, messageId);
+  await tx.update(message).set({ dispatchPayload: null }).where(eq(message.id, messageId));
   const error = result.failure
     ? { code: result.failure.code, message: result.failure.message }
     : PROVIDER_ERROR;

@@ -41,13 +41,13 @@ export function ConnectStep({ setup, onDone }: { setup: Setup; onDone: () => voi
   if (me.isPending || connection.isPending) return <ConnectStepSkeleton />;
   // A failed refetch keeps what was loaded; only a first load with nothing to show is an error.
   if (me.data === undefined || connection.data === undefined) {
-    return <FormAlert message="We could not load your Telnyx connection. Try again." />;
+    return <FormAlert message="We could not load your phone connection. Try again." />;
   }
   const canManage = MANAGER_ROLES.has(me.data.organization.role);
   if (!canManage) {
     return (
       <p className="max-w-[46ch] text-[15px] text-[color:var(--muted)] leading-relaxed">
-        Ask an owner or admin to connect Telnyx.
+        Ask an owner or admin to connect your phone provider.
       </p>
     );
   }
@@ -58,7 +58,7 @@ export function ConnectStep({ setup, onDone }: { setup: Setup; onDone: () => voi
     return (
       <div className="flex max-w-[440px] flex-col gap-4">
         <p className="text-[15px] leading-relaxed">
-          This workspace is connected to Plivo. Change it in Settings › Connectors.
+          This workspace is connected to another phone provider. Change it in Settings › Connectors.
         </p>
         <CredentialCheck setup={setup} />
         <div className="flex flex-wrap gap-2">

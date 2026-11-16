@@ -5,8 +5,11 @@ import {
   canMarkApproved,
   composerCopy,
   composerLink,
+  formatBytes,
+  formatDuration,
   liveSenderErrorCopy,
   liveSenderStatus,
+  quoteText,
   senderSummary,
   showLiveSender,
   statusMeta,
@@ -131,38 +134,36 @@ describe('threadState', () => {
 describe('composerCopy', () => {
   it('explains a pending SMS registration', () => {
     expect(composerCopy('sms', composer('paused', 'registration_pending'))).toEqual({
-      title: 'SMS sending paused · 10DLC',
-      body: 'Inbound SMS is received and kept. Outbound starts when 10DLC is approved.',
+      title: 'SMS sending paused · registration',
+      body: 'Inbound SMS is received and kept. Sending starts when your US texting registration is approved. Check it under Channels.',
     });
   });
 
   it('explains a pending WhatsApp registration', () => {
     expect(composerCopy('whatsapp', composer('paused', 'registration_pending'))).toEqual({
-      title: 'WhatsApp sending paused · Meta approval',
-      body: 'Inbound WhatsApp is received and kept. Outbound starts when Meta approves your business.',
+      title: 'WhatsApp sending paused · approval',
+      body: 'Inbound WhatsApp is received and kept. Sending starts when Meta approves your WhatsApp Business number.',
     });
   });
 
-  it('names the channel when no sender is connected', () => {
-    const body = 'Connect a number in Numbers to send. Inbound replies still arrive.';
+  it('points to Enable when the channel has no sender', () => {
     expect(composerCopy('sms', composer('paused', 'no_sender'))).toEqual({
-      title: 'No SMS sender connected',
-      body,
+      title: "SMS isn't enabled yet",
+      body: 'Enable SMS under Channels to send. Inbound replies still arrive.',
     });
-    expect(composerCopy('whatsapp', composer('paused', 'no_sender'))).toEqual({
-      title: 'No WhatsApp sender connected',
-      body,
-    });
+    expect(composerCopy('whatsapp', composer('paused', 'no_sender')).title).toBe(
+      "WhatsApp isn't enabled yet",
+    );
   });
 
-  it('covers a rejected registration and live sending being off', () => {
+  it('covers a rejected registration and live sending being off, naming no provider', () => {
     expect(composerCopy('sms', composer('paused', 'registration_rejected'))).toEqual({
       title: 'Registration rejected',
-      body: 'Fix the registration in Numbers before sending.',
+      body: 'The SMS registration was not approved. See Channels for what to fix.',
     });
     expect(composerCopy('sms', composer('paused', 'live_disabled'))).toEqual({
       title: 'Live sending is off',
-      body: 'Sending stays off until US texting registration (SMS) or WhatsApp approval is confirmed.',
+      body: 'Connect your phone provider in Settings to send for real.',
     });
   });
 
@@ -229,9 +230,9 @@ describe('threadDayGroups', () => {
 });
 
 describe('composerLink', () => {
-  it('links live_disabled to the Voice section of Settings, where Telnyx is connected', () => {
+  it('links live_disabled to the Voice section of Settings, where the provider is connected', () => {
     expect(composerLink(composer('paused', 'live_disabled'))).toEqual({
-      label: 'Set up live sending',
+      label: 'Connect your phone provider',
       to: '/settings',
       hash: 'voice-heading',
     });
@@ -377,17 +378,25 @@ describe('liveSenderErrorCopy', () => {
 });
 
 describe('liveSenderStatus', () => {
-  it('derives the SMS status from Numbers, with no status to set', () => {
-    expect(liveSenderStatus('sms')).toEqual({
+  it('never lets anyone set a status: both channels follow the phone provider', () => {
+    expect(liveSenderStatus('sms').settable).toBe(false);
+    expect(liveSenderStatus('whatsapp')).toEqual({
       settable: false,
-      note: 'Registration status comes from Numbers.',
+      note: 'Approval comes from your phone provider, checked automatically.',
     });
   });
+});
 
-  it('lets an owner set the WhatsApp status until Telnyx reports it', () => {
-    expect(liveSenderStatus('whatsapp')).toEqual({
-      settable: true,
-      note: 'Set it to Approved once WhatsApp approves this number.',
-    });
+describe('formatBytes, formatDuration and quoteText', () => {
+  it('formats sizes, lengths and quotes', () => {
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(340 * 1024)).toBe('340 KB');
+    expect(formatBytes(1.25 * 1024 * 1024)).toBe('1.3 MB');
+    expect(formatBytes(2 * 1024 * 1024)).toBe('2 MB');
+    expect(formatDuration(7.4)).toBe('0:07');
+    expect(formatDuration(750)).toBe('12:30');
+    expect(formatDuration(Number.NaN)).toBe('0:00');
+    expect(quoteText({ body: ' Hi ', attachmentKind: null })).toBe('Hi');
+    expect(quoteText({ body: '', attachmentKind: 'voice' })).toBe('Voice message');
   });
 });

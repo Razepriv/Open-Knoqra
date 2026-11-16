@@ -5,11 +5,23 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, posix, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?|astro)$/;
 /** Files whose Pro-looking specifiers are test data, not imports (scripts/export is private too). */
 const IGNORED = new Set(['scripts/check-editions.test.mjs']);
+/**
+ * A glob of the export manifest (`*` within a segment, `**` across segments) as a test of a
+ * repository path.
+ */
+export function globMatcher(glob) {
+  const source = glob
+    .split('**')
+    .map((part) => part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '[^/]*'))
+    .join('.*');
+  const pattern = new RegExp(`^${source}$`);
+  return (path) => pattern.test(path);
+}
 /** Static imports and re-exports, side-effect imports, dynamic imports and require calls. */
 const SPECIFIERS = [
   /\bfrom\s*['"]([^'"]+)['"]/g,
@@ -39,9 +51,10 @@ export function reachesPro(from, specifier) {
 
 /**
  * The violations among `files` (repository paths): core files importing Pro code, and `pro/`
- * folders without a LICENSE. `read` returns a file's text; `exists` says whether a path exists.
+ * folders without a LICENSE. `read` returns a file's text; `exists` says whether a path exists;
+ * `isPrivate` says whether the public export leaves a file out (so it may use Pro code).
  */
-export function checkEditions(files, read, exists) {
+export function checkEditions(files, read, exists, isPrivate = () => false) {
   const errors = [];
   const proRoots = new Set();
   for (const file of files) {
@@ -50,7 +63,15 @@ export function checkEditions(files, read, exists) {
       proRoots.add(parts.slice(0, parts.indexOf('pro') + 1).join('/'));
       continue;
     }
-    if (!SOURCE.test(file) || IGNORED.has(file) || file.startsWith('scripts/export/')) continue;
+    // Private files the export leaves out may use Pro code: they never reach the public tree.
+    if (
+      !SOURCE.test(file) ||
+      IGNORED.has(file) ||
+      file.startsWith('scripts/export/') ||
+      isPrivate(file)
+    ) {
+      continue;
+    }
     for (const specifier of specifiersOf(read(file))) {
       if (reachesPro(file, specifier)) errors.push(`${file}: imports Pro code (${specifier})`);
     }
@@ -90,6 +111,18 @@ function listFiles(root) {
 const isMain =
   process.argv[1] !== undefined &&
   realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+/**
+ * In the private repository, the export manifest's left-out paths (other than the `pro/` folders,
+ * which have their own rule). The public tree has no manifest and none of those files.
+ */
+async function privateMatcher(root) {
+  const manifest = join(root, 'scripts', 'export', 'manifest.mjs');
+  if (!existsSync(manifest)) return () => false;
+  const { exclude } = await import(pathToFileURL(manifest).href);
+  const tests = exclude.filter((glob) => glob !== '**/pro/**').map(globMatcher);
+  return (path) => tests.some((test) => test(path));
+}
+
 if (isMain) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const files = listFiles(root);
@@ -97,6 +130,7 @@ if (isMain) {
     files,
     (f) => readFileSync(join(root, f), 'utf8'),
     (f) => existsSync(join(root, f)),
+    await privateMatcher(root),
   );
   for (const error of errors) process.stderr.write(`${error}\n`);
   process.stdout.write(

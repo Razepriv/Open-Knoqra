@@ -2780,6 +2780,443 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/messaging/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SMS and WhatsApp: not enabled, pending or live, and what Enable can do here */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Channel status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessagingChannels"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/sms/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register for US business texting (10DLC) with your own phone provider account */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SmsRegistrationRequest"];
+                };
+            };
+            responses: {
+                /** @description Channel status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessagingChannels"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Invalid details */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can enable channels */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A registration is in progress, or no code is expected */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Live sending is not available here, or no phone provider is connected */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The phone provider could not be reached */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/sms/registration/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the code texted to a sole proprietor's mobile */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SmsRegistrationCode"];
+                };
+            };
+            responses: {
+                /** @description Channel status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessagingChannels"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Invalid details */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can enable channels */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A registration is in progress, or no code is expected */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Live sending is not available here, or no phone provider is connected */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The phone provider could not be reached */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/sms/registration/code/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Text the sole proprietor a new code */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Channel status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessagingChannels"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Invalid details */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can enable channels */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A registration is in progress, or no code is expected */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Live sending is not available here, or no phone provider is connected */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The phone provider could not be reached */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messaging/channels/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check SMS and WhatsApp status with the phone provider now (sync, registration) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Channel status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessagingChannels"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Invalid details */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can enable channels */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A registration is in progress, or no code is expected */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Live sending is not available here, or no phone provider is connected */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The phone provider could not be reached */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/messaging/templates": {
         parameters: {
             query?: never;
@@ -3624,6 +4061,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/messages/{id}/reaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set or remove the workspace's reaction to an inbound WhatsApp message */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetReaction"];
+                };
+            };
+            responses: {
+                /** @description The message with its reactions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Message"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Body failed validation */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No such message in the active organization */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not a reactable message, too old, or sending is not allowed now */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/messages/{id}": {
         parameters: {
             query?: never;
@@ -3665,6 +4192,196 @@ export interface paths {
                     };
                 };
                 /** @description No such message in the active organization */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload a file to send on a WhatsApp conversation (raw body, Content-Type and Content-Length required); send it by naming its id in attachmentId */
+        post: {
+            parameters: {
+                query?: {
+                    name?: string;
+                    voice?: "true" | "false";
+                    durationMs?: number | null;
+                    waveform?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            responses: {
+                /** @description Stored draft file */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessageAttachment"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Invalid query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No such conversation in the active organization */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Content-Length is required */
+                411: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Larger than WhatsApp allows */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not a WhatsApp conversation, or a type WhatsApp cannot send */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description File storage is not set up on this server */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One attachment with a fresh signed link */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Attachment */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["MessageAttachment"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No such attachment in the active organization */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7216,6 +7933,71 @@ export interface components {
             /** @enum {string} */
             registrationStatus?: "not_started" | "pending" | "approved" | "rejected";
         };
+        MessagingChannels: {
+            sms: components["schemas"]["ChannelStatus"];
+            whatsapp: components["schemas"]["ChannelStatus"];
+        };
+        ChannelStatus: {
+            /** @enum {string} */
+            channel: "sms" | "whatsapp";
+            /** @enum {string} */
+            state: "not_enabled" | "pending" | "live" | "rejected";
+            address: string | null;
+            displayName: string | null;
+            detail: string;
+            sandbox: boolean;
+            enable: {
+                available: boolean;
+                /** @enum {string} */
+                reason: "ok" | "not_manager" | "no_connection" | "not_live" | "done";
+            };
+            registration: components["schemas"]["SmsRegistration"];
+        };
+        SmsRegistration: {
+            /** @enum {string} */
+            state: "submitting" | "otp_required" | "brand_pending" | "campaign_pending" | "number_pending" | "approved" | "rejected" | "failed";
+            /** @enum {string} */
+            entityType: "sole_proprietor" | "private_profit" | "public_profit" | "non_profit";
+            phone: string;
+            brandName: string;
+            failureReason: string | null;
+            /** Format: date-time */
+            lastCheckedAt: string | null;
+        } | null;
+        SmsRegistrationRequest: {
+            /** @enum {string} */
+            entityType: "sole_proprietor" | "private_profit" | "public_profit" | "non_profit";
+            phone?: string;
+            brandName: string;
+            legalName?: string;
+            ein?: string;
+            firstName?: string;
+            lastName?: string;
+            /** Format: email */
+            email: string;
+            contactPhone: string;
+            street: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            website?: string;
+            /** @enum {string} */
+            vertical: "AGRICULTURE" | "COMMUNICATION" | "CONSTRUCTION" | "EDUCATION" | "ENERGY" | "ENTERTAINMENT" | "FINANCIAL" | "GOVERNMENT" | "HEALTHCARE" | "HOSPITALITY" | "HUMAN_RESOURCES" | "INSURANCE" | "LEGAL" | "MANUFACTURING" | "NGO" | "PROFESSIONAL" | "REAL_ESTATE" | "RETAIL" | "TECHNOLOGY" | "TRANSPORTATION";
+            /** @enum {string} */
+            usecase?: "CUSTOMER_CARE" | "ACCOUNT_NOTIFICATION" | "DELIVERY_NOTIFICATION" | "MARKETING";
+            stockSymbol?: string;
+            stockExchange?: string;
+            messageFlow: string;
+            description: string;
+            optinMessage: string;
+            helpMessage: string;
+            optoutMessage: string;
+            sample1: string;
+            sample2: string;
+        };
+        SmsRegistrationCode: {
+            pin: string;
+        };
         MessageTemplates: {
             items: components["schemas"]["MessageTemplate"][];
         };
@@ -7327,11 +8109,46 @@ export interface components {
             } | null;
             authorUserId: string | null;
             providerMessageId: string | null;
+            clientMessageId: string | null;
             /** Format: date-time */
             occurredAt: string;
             /** Format: date-time */
             statusUpdatedAt: string;
+            attachments: components["schemas"]["MessageAttachment"][];
+            reactions: components["schemas"]["MessageReaction"][];
+            replyTo: components["schemas"]["MessageReplyPreview"];
+            replyable: boolean;
         };
+        MessageAttachment: {
+            id: string;
+            /** @enum {string} */
+            kind: "image" | "audio" | "voice" | "video" | "document" | "sticker";
+            mimeType: string;
+            sizeBytes: number | null;
+            fileName: string | null;
+            /** @enum {string} */
+            status: "pending" | "stored" | "failed";
+            durationMs: number | null;
+            waveform: number[] | null;
+            url: string | null;
+            /** Format: date-time */
+            urlExpiresAt: string | null;
+        };
+        MessageReaction: {
+            emoji: string;
+            /** @enum {string} */
+            direction: "inbound" | "outbound";
+            /** @enum {string} */
+            status: "pending" | "sent" | "failed";
+        };
+        MessageReplyPreview: {
+            id: string;
+            /** @enum {string} */
+            direction: "inbound" | "outbound";
+            body: string;
+            /** @enum {string|null} */
+            attachmentKind: "image" | "audio" | "voice" | "video" | "document" | "sticker" | null;
+        } | null;
         ThreadNote: {
             id: string;
             body: string;
@@ -7348,6 +8165,12 @@ export interface components {
             clientMessageId: string;
             body?: string;
             templateId?: string;
+            attachmentId?: string;
+            replyToMessageId?: string;
+        };
+        SetReaction: {
+            /** @description One emoji; empty removes yours. */
+            emoji: string;
         };
         MessageDetail: components["schemas"]["Message"] & {
             statusHistory: components["schemas"]["MessageStatusEntry"][];

@@ -355,7 +355,7 @@ describe('telnyx send failures', () => {
       channel: 'sms',
       status: 'opted_out',
       source: 'system',
-      evidence: 'Telnyx reported an opt-out',
+      evidence: 'The phone provider reported an opt-out',
       actorUserId: null,
     });
     expect(await composerOf(sandbox, t.conversationId)).toEqual({
@@ -364,7 +364,7 @@ describe('telnyx send failures', () => {
       windowExpiresAt: null,
     });
     expect(await timelineTitles(sandbox, t.contactId)).toContain(
-      'SMS opted out (reported by Telnyx)',
+      'SMS opted out (reported by the phone provider)',
     );
   });
 
@@ -380,7 +380,7 @@ describe('telnyx send failures', () => {
     );
     expect(optOuts.map((e) => e.channel)).toEqual(['whatsapp']);
     expect(await timelineTitles(sandbox, t.contactId)).toContain(
-      'WhatsApp opted out (reported by Telnyx)',
+      'WhatsApp opted out (reported by the phone provider)',
     );
   });
 
@@ -401,9 +401,9 @@ describe('telnyx send failures', () => {
     );
     expect(optOuts).toHaveLength(1);
     const titles = await timelineTitles(sandbox, t.contactId);
-    expect(titles.filter((title) => title === 'SMS opted out (reported by Telnyx)')).toHaveLength(
-      1,
-    );
+    expect(
+      titles.filter((title) => title === 'SMS opted out (reported by the phone provider)'),
+    ).toHaveLength(1);
   });
 
   it('locks the contact before the message when recording a reported opt-out', async () => {
@@ -468,7 +468,7 @@ describe('telnyx send failures', () => {
       reason: 'do_not_contact',
     });
     expect(await timelineTitles(sandbox, t.contactId)).not.toContain(
-      'SMS opted out (reported by Telnyx)',
+      'SMS opted out (reported by the phone provider)',
     );
   });
 });

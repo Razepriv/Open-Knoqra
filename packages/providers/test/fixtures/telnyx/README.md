@@ -13,3 +13,14 @@ anyone relies on the field names. Numbers use +1 202 555 01xx and every id is ma
 are also hand-written from the documented Telnyx v2 shapes, not recorded. Both endpoints must be
 checked against a live account before a real purchase. Numbers use +1 202 555 01xx and every id is
 made up.
+
+## WhatsApp account reads (messaging upgrade, 2026-11-16)
+
+Built from Telnyx's OpenAPI document (`team-telnyx/openapi` spec3.json, `WhatsappPhoneResponse` and
+`ListWabas`) and the Embedded Signup guide's status table, not recorded:
+
+- `whatsapp-phone-numbers.json`: `GET /v2/whatsapp/phone_numbers`. One CONNECTED number and one
+  still PENDING, with the documented fields (`status`, `waba_id`, `display_name`,
+  `quality_rating`, `coexistence_state`).
+- `whatsapp-business-accounts.json`: `GET /v2/whatsapp/business_accounts`. One ACTIVE account with
+  `account_review_status` APPROVED and one PENDING.

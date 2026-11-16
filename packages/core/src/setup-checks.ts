@@ -37,7 +37,8 @@ export interface SetupCheck {
 }
 
 const DEPLOY_DOC_HREF = 'https://github.com/Razepriv/Open-Knoqra/blob/main/docs/self-host.md';
-const TEN_DLC_HREF = 'https://portal.telnyx.com/#/app/messaging/compliance';
+/** US texting registration runs in the Inbox (Channels › SMS › Enable). */
+const TEN_DLC_HREF = '/inbox';
 const WHATSAPP_HREF = 'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started';
 
 const isReal = (provider: SetupFacts['provider']): provider is 'telnyx' | 'plivo' =>
@@ -45,27 +46,39 @@ const isReal = (provider: SetupFacts['provider']): provider is 'telnyx' | 'plivo
 
 function credentialCheck(f: SetupFacts): SetupCheck {
   const fix: SetupFix = { kind: 'wizard', step: 'connect' };
-  const name = f.provider === 'plivo' ? 'Plivo' : 'Telnyx';
-  const title = `${name} credential`;
+  // Provider-neutral: the Desk never names the carrier outside the connection form itself.
+  const title = 'Phone provider credential';
   if (!f.credentialStored) {
-    return { id: 'credential', status: 'fail', title, detail: `No ${name} key saved yet.`, fix };
+    return {
+      id: 'credential',
+      status: 'fail',
+      title,
+      detail: 'No phone provider key saved yet.',
+      fix,
+    };
   }
   if (f.lastPoll === 'auth_failed') {
-    return { id: 'credential', status: 'fail', title, detail: `${name} rejected the key`, fix };
+    return {
+      id: 'credential',
+      status: 'fail',
+      title,
+      detail: 'Your phone provider rejected the key',
+      fix,
+    };
   }
   if (isReal(f.provider) && (f.lastPoll === null || f.lastPoll === 'unavailable')) {
     return {
       id: 'credential',
       status: 'pending',
       title,
-      detail: `Saved. Waiting for ${name} to confirm it.`,
+      detail: 'Saved. Waiting for your phone provider to confirm it.',
       fix,
     };
   }
   const detail =
     f.provider === 'fake'
       ? 'Saved. Calls use the fake provider in development.'
-      : `Saved and accepted by ${name}.`;
+      : 'Saved and accepted by your phone provider.';
   return { id: 'credential', status: 'pass', title, detail, fix };
 }
 
@@ -94,7 +107,7 @@ function webhookCheck(f: SetupFacts): SetupCheck {
       id: 'webhook',
       status: 'fail',
       title,
-      detail: 'The Telnyx webhook public key is not configured.',
+      detail: 'The phone provider webhook key is not configured.',
       fix: { kind: 'external', href: DEPLOY_DOC_HREF, label: 'Set TELNYX_PUBLIC_KEY' },
     };
   }
@@ -112,7 +125,7 @@ function webhookCheck(f: SetupFacts): SetupCheck {
 }
 
 function tenDlcCheck(f: SetupFacts): SetupCheck {
-  const fix: SetupFix = { kind: 'external', href: TEN_DLC_HREF, label: 'Register in Telnyx' };
+  const fix: SetupFix = { kind: 'external', href: TEN_DLC_HREF, label: 'Enable SMS in the Inbox' };
   const title = '10DLC registration';
   if (f.tenDlc === 'registered' || f.tenDlc === 'not_required') {
     const detail =
@@ -132,7 +145,8 @@ function tenDlcCheck(f: SetupFacts): SetupCheck {
     id: 'ten_dlc',
     status: 'fail',
     title,
-    detail: 'Needs a live Telnyx account. US SMS sending waits for 10DLC.',
+    detail:
+      'Needs a live phone provider account. US SMS sending waits for US texting registration.',
     fix,
   };
 }

@@ -1,6 +1,6 @@
-import type { MessagingChannel } from '@knoqra/core';
+import type { AttachmentKind, MessagingChannel } from '@knoqra/core';
 import { z } from 'zod';
-import type { MessageEventPayload } from '../messaging';
+import type { InboundMediaPayload, MessageEventPayload } from '../messaging';
 import type { ProviderEventType } from '../types';
 import { SAFE_TELNYX_CODE } from './messaging-errors';
 
@@ -51,6 +51,59 @@ const partySchema = z.union([z.object({ phone_number: addressSchema }), addressS
 const partyAddress = (party: z.infer<typeof partySchema>): string =>
   typeof party === 'string' ? party : party.phone_number;
 
+/**
+ * A WhatsApp media object inside `body.<type>` (Telnyx's "Downloading Inbound Media" guide): a
+ * Telnyx-hosted `url` normally, or Meta's media `id` when Telnyx could not pre-fetch the file, plus
+ * `mime_type` and `sha256`. Meta's per-type extras pass through: `caption` (image, video,
+ * document), `filename` (document), `voice` (audio recorded as a voice note), `animated` (sticker).
+ */
+const mediaObjectSchema = z.object({
+  url: z.string().max(2048).optional(),
+  id: z.string().min(1).max(256).optional(),
+  mime_type: z.string().max(128).optional(),
+  sha256: z.string().max(128).optional(),
+  caption: z.string().optional(),
+  filename: z.string().optional(),
+  voice: z.boolean().optional(),
+});
+const MEDIA_TYPES = ['image', 'audio', 'video', 'document', 'sticker'] as const;
+type MediaType = (typeof MEDIA_TYPES)[number];
+
+/** WhatsApp content (`payload.body`), which mirrors Meta's message object. */
+const whatsappBodySchema = z.object({
+  type: z.string().optional(),
+  /** Meta's id for the message (the wamid). `body.id` is Telnyx's. */
+  foreign_id: z.string().min(1).max(256).optional(),
+  text: z.object({ body: z.string() }).optional(),
+  context: z
+    .object({
+      id: z.string().min(1).max(256).optional(),
+      message_id: z.string().max(256).optional(),
+    })
+    .optional(),
+  reaction: z
+    .object({ message_id: z.string().min(1).max(256), emoji: z.string().max(32).optional() })
+    .optional(),
+  button: z.object({ text: z.string().optional() }).optional(),
+  interactive: z
+    .object({
+      button_reply: z.object({ title: z.string().optional() }).optional(),
+      list_reply: z.object({ title: z.string().optional() }).optional(),
+    })
+    .optional(),
+  image: mediaObjectSchema.optional(),
+  audio: mediaObjectSchema.optional(),
+  video: mediaObjectSchema.optional(),
+  document: mediaObjectSchema.optional(),
+  sticker: mediaObjectSchema.optional(),
+});
+type WhatsAppBody = z.infer<typeof whatsappBodySchema>;
+
+/** MMS-style media (`payload.media[]`), used as a fallback URL for a WhatsApp media object. */
+const mmsMediaSchema = z.array(
+  z.object({ url: z.string().max(2048).optional(), content_type: z.string().optional() }),
+);
+
 const payloadSchema = z.object({
   id: z.string().min(1).max(128),
   type: z.string(),
@@ -63,7 +116,8 @@ const payloadSchema = z.object({
   status: z.string().optional(),
   text: z.string().nullable().optional(),
   /** WhatsApp content. Inbound text is at `body.text.body`. */
-  body: z.object({ text: z.object({ body: z.string() }).optional() }).optional(),
+  body: whatsappBodySchema.optional(),
+  media: mmsMediaSchema.optional(),
   errors: z.array(z.unknown()).optional(),
 });
 type TelnyxPayload = z.infer<typeof payloadSchema>;
@@ -107,6 +161,107 @@ function inboundText(payload: TelnyxPayload, channel: MessagingChannel): string 
   const text = channel === 'whatsapp' ? (payload.body?.text?.body ?? payload.text) : payload.text;
   if (typeof text !== 'string' || text.trim().length === 0) return null;
   return cap(text, MAX_BODY);
+}
+
+const nonEmpty = (text: string | undefined | null): string | undefined => {
+  const trimmed = text?.trim();
+  return trimmed ? cap(trimmed, MAX_BODY) : undefined;
+};
+
+/** Only an https URL is kept: the consumer downloads it server-side. */
+const httpsUrl = (url: string | undefined): string | undefined =>
+  url !== undefined && /^https:\/\/[^\s]+$/i.test(url) ? url : undefined;
+
+const DEFAULT_MIME: Record<MediaType, string> = {
+  image: 'image/jpeg',
+  audio: 'audio/ogg',
+  video: 'video/mp4',
+  document: 'application/octet-stream',
+  sticker: 'image/webp',
+};
+
+/** `audio` recorded with WhatsApp's voice button is a voice note. */
+function kindOf(type: MediaType, media: z.infer<typeof mediaObjectSchema>): AttachmentKind {
+  return type === 'audio' && media.voice === true ? 'voice' : type;
+}
+
+function inboundMedia(
+  type: MediaType,
+  body: WhatsAppBody,
+  payload: TelnyxPayload,
+): { media: InboundMediaPayload; caption?: string } | null {
+  const object = body[type];
+  if (!object) return null;
+  const url = httpsUrl(object.url) ?? httpsUrl(payload.media?.[0]?.url);
+  const mediaId = object.id;
+  if (url === undefined && mediaId === undefined) return null;
+  const media: InboundMediaPayload = {
+    kind: kindOf(type, object),
+    mimeType: (object.mime_type ?? payload.media?.[0]?.content_type ?? DEFAULT_MIME[type]).slice(
+      0,
+      128,
+    ),
+    ...(url === undefined ? {} : { url }),
+    ...(mediaId === undefined ? {} : { mediaId }),
+    ...(object.sha256 === undefined ? {} : { sha256: object.sha256 }),
+    ...(object.filename?.trim() ? { fileName: object.filename.trim().slice(0, 255) } : {}),
+  };
+  const caption = type === 'audio' || type === 'sticker' ? undefined : nonEmpty(object.caption);
+  return { media, ...(caption === undefined ? {} : { caption }) };
+}
+
+/** Words for a message type the Inbox cannot show as such (a location, a contact card, ...). */
+const OTHER_TYPE_TEXT: Record<string, string> = {
+  location: 'Shared a location.',
+  contacts: 'Shared a contact card.',
+  order: 'Sent an order.',
+  unsupported: 'Sent a message WhatsApp could not deliver here.',
+};
+
+/**
+ * The content of an inbound WhatsApp message: text, a file (with its caption), a reaction, or a
+ * plain-words stand-in for other types; null for what the Inbox does not keep (edits, revokes,
+ * system notices).
+ */
+function whatsappContent(
+  payload: TelnyxPayload,
+): Pick<MessageEventPayload, 'body' | 'media' | 'reaction'> | null {
+  const body = payload.body ?? {};
+  const type = body.type ?? 'text';
+  if ((MEDIA_TYPES as readonly string[]).includes(type)) {
+    const found = inboundMedia(type as MediaType, body, payload);
+    if (!found) return null;
+    return { media: found.media, ...(found.caption === undefined ? {} : { body: found.caption }) };
+  }
+  if (type === 'reaction') {
+    if (!body.reaction) return null;
+    const emoji = body.reaction.emoji?.trim();
+    return { reaction: { targetId: body.reaction.message_id, emoji: emoji ? emoji : null } };
+  }
+  if (type === 'edit' || type === 'revoke' || type === 'system') return null;
+  if (type === 'text') {
+    const text = inboundText(payload, 'whatsapp');
+    return text === null ? null : { body: text };
+  }
+  const chosen =
+    nonEmpty(body.button?.text) ??
+    nonEmpty(body.interactive?.button_reply?.title) ??
+    nonEmpty(body.interactive?.list_reply?.title) ??
+    OTHER_TYPE_TEXT[type] ??
+    OTHER_TYPE_TEXT.unsupported;
+  return { body: chosen };
+}
+
+/** The reply target and the wamid of an inbound WhatsApp message. */
+function whatsappRefs(
+  payload: TelnyxPayload,
+): Pick<MessageEventPayload, 'replyToId' | 'channelMessageId'> {
+  const replyToId = payload.body?.context?.id ?? payload.body?.context?.message_id;
+  const channelMessageId = payload.body?.foreign_id;
+  return {
+    ...(replyToId ? { replyToId } : {}),
+    ...(channelMessageId ? { channelMessageId } : {}),
+  };
 }
 
 /** Outbound receipts: which normalized event, if any, a Telnyx event and status mean. */
@@ -171,6 +326,15 @@ export function normalizeTelnyxMessage(body: unknown): TelnyxMessageEvent | null
   };
 
   if (data.event_type === 'message.received') {
+    if (channel === 'whatsapp') {
+      const content = whatsappContent(payload);
+      if (content === null) return null;
+      return {
+        ...base,
+        type: 'message.received',
+        payload: { channel, from, to, ...content, ...whatsappRefs(payload) },
+      };
+    }
     const text = inboundText(payload, channel);
     if (text === null) return null;
     return { ...base, type: 'message.received', payload: { channel, from, to, body: text } };

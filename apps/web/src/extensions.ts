@@ -38,6 +38,12 @@ export interface DeskExtension {
   NumbersPanel?: ComponentType<{ canManage: boolean }>;
   /** A notice under the top bar on every signed-in page; renders nothing when there is none. */
   ShellBanner?: ComponentType;
+  /**
+   * WhatsApp enabling through the edition's own platform (for example a hosted signup). It renders
+   * in the WhatsApp Enable dialog; `fallback` is the core's bring-your-own steps, to show when the
+   * platform path is not available, and `onCheck` looks for the new number now.
+   */
+  WhatsAppSignup?: ComponentType<{ fallback: ReactNode; onCheck: () => void; checking: boolean }>;
 }
 
 /**

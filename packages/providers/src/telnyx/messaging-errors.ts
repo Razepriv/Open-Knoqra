@@ -47,22 +47,22 @@ const FAILURES = {
   },
   provider_auth: {
     code: 'provider_auth',
-    message: 'Telnyx rejected the API key.',
+    message: 'Your phone provider rejected the saved API key.',
     retryable: false,
   },
   provider_rate_limited: {
     code: 'provider_rate_limited',
-    message: 'Telnyx is rate limiting sends. Try again shortly.',
+    message: 'Your phone provider is limiting sends. Try again shortly.',
     retryable: true,
   },
   provider_rejected: {
     code: 'provider_rejected',
-    message: 'Telnyx rejected the message.',
+    message: 'Your phone provider rejected the message.',
     retryable: false,
   },
   provider_error: {
     code: 'provider_error',
-    message: 'Telnyx could not be reached or failed to accept the message.',
+    message: 'Your phone provider could not be reached or did not accept the message.',
     retryable: true,
   },
 } as const satisfies Record<MessageFailure['code'], MessageFailure>;

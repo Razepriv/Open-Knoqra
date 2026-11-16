@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { checkEditions, reachesPro, specifiersOf } from './check-editions.mjs';
+import { checkEditions, globMatcher, reachesPro, specifiersOf } from './check-editions.mjs';
 
 describe('check-editions', () => {
   it('finds static, dynamic and side-effect specifiers', () => {
@@ -41,5 +41,29 @@ describe('check-editions', () => {
       () => true,
     );
     assert.deepEqual(errors, ['apps/web/src/a.tsx: imports Pro code (../pro/b)']);
+  });
+
+  it('lets files the export leaves out use Pro code', () => {
+    const files = {
+      'apps/private-app/src/a.ts': "import type { components } from '@knoqra/api-client/pro';",
+      'apps/web/src/b.tsx': "import '@knoqra/api-client/pro';",
+    };
+    const errors = checkEditions(
+      Object.keys(files),
+      (f) => files[f],
+      () => true,
+      globMatcher('apps/private-app/**'),
+    );
+    assert.deepEqual(errors, ['apps/web/src/b.tsx: imports Pro code (@knoqra/api-client/pro)']);
+  });
+
+  it('matches export globs within and across segments', () => {
+    assert.equal(globMatcher('apps/*/settings.local.json')('apps/api/settings.local.json'), true);
+    assert.equal(
+      globMatcher('apps/*/settings.local.json')('apps/api/x/settings.local.json'),
+      false,
+    );
+    assert.equal(globMatcher('docs/pro/**')('docs/pro/a/b.md'), true);
+    assert.equal(globMatcher('HANDOVER.md')('HANDOVER.mdx'), false);
   });
 });

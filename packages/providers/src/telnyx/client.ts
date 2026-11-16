@@ -22,6 +22,14 @@ import type {
 } from '../types';
 import { utf8ToBase64 } from './base64';
 import { TelnyxApiError } from './errors';
+import {
+  type TelnyxWhatsAppAccount,
+  type TelnyxWhatsAppNumber,
+  type WhatsAppNumberFacts,
+  whatsappAccountsPageSchema,
+  whatsappFactsByNumber,
+  whatsappNumbersPageSchema,
+} from './whatsapp-accounts';
 
 const DEFAULT_API_BASE = 'https://api.telnyx.com/v2';
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
@@ -282,17 +290,74 @@ export class TelnyxProvider
     );
     const { records } = await this.readJson(campaignRes, campaignsSchema);
     const campaigns = new Map(records.map((r) => [r.phoneNumber, r.assignmentStatus]));
+    const whatsapp = await this.readWhatsAppFacts();
     return rows.map((row) => {
       const sms = row.messaging_profile_id != null;
+      const facts = whatsapp?.get(row.phone_number);
       return {
         providerNumberId: row.id,
         e164: row.phone_number,
         status: mapStatus(row.status),
-        capabilities: { voice: row.connection_id != null, sms, mms: sms, whatsapp: false },
+        capabilities: {
+          voice: row.connection_id != null,
+          sms,
+          mms: sms,
+          whatsapp: facts !== undefined,
+        },
         tenDlc: mapCampaignStatus(campaigns.get(row.phone_number), sms),
-        whatsapp: 'none',
+        whatsapp: facts?.state ?? 'none',
+        ...(whatsapp === null ? { whatsappSynced: false } : {}),
+        ...(facts
+          ? {
+              whatsappDetail: {
+                displayName: facts.displayName,
+                qualityRating: facts.qualityRating,
+              },
+            }
+          : {}),
       };
     });
+  }
+
+  /**
+   * The account's WhatsApp numbers and Meta's verdict on each (whatsapp-accounts.ts). A 404 on
+   * these reads means no WhatsApp product: an empty map. Anything else that fails, a 401 or 403
+   * from a restricted key included, is unknown: null, so the sync keeps what it knew instead of
+   * dropping a live WhatsApp sender.
+   */
+  async readWhatsAppFacts(): Promise<Map<string, WhatsAppNumberFacts> | null> {
+    const numbers: TelnyxWhatsAppNumber[] = [];
+    const accounts: TelnyxWhatsAppAccount[] = [];
+    try {
+      await this.eachPage(
+        (page) =>
+          `/whatsapp/phone_numbers?${query([
+            ['page[number]', String(page)],
+            ['page[size]', PAGE_SIZE],
+          ])}`,
+        whatsappNumbersPageSchema,
+        (data) => {
+          numbers.push(...data);
+        },
+      );
+      if (numbers.length > 0) {
+        await this.eachPage(
+          (page) =>
+            `/whatsapp/business_accounts?${query([
+              ['page[number]', String(page)],
+              ['page[size]', PAGE_SIZE],
+            ])}`,
+          whatsappAccountsPageSchema,
+          (data) => {
+            accounts.push(...data);
+          },
+        );
+      }
+    } catch (error) {
+      if (error instanceof TelnyxApiError && error.status === 404) return new Map();
+      return null;
+    }
+    return whatsappFactsByNumber(numbers, accounts);
   }
 
   async fetchUsage(period: DateRange): Promise<ProviderUsage[]> {

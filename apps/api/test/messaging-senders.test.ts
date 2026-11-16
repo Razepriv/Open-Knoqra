@@ -243,7 +243,7 @@ describe('messaging senders and sandbox', () => {
     });
   });
 
-  it('computes liveEnabled from provider, channel, flags, PROVIDER and the credential', () => {
+  it('computes liveEnabled from provider, PROVIDER and the credential, ignoring the retired flags', () => {
     const base = env as unknown as Env;
     expect(liveEnabled('fake', 'sms', base, false)).toBe(true);
     expect(
@@ -252,33 +252,20 @@ describe('messaging senders and sandbox', () => {
     expect(liveEnabled('fake', 'sms', { ...base, APP_ENV: 'production' } as Env, false)).toBe(
       false,
     );
-    const live = {
-      ...base,
-      PROVIDER: 'telnyx',
-      SMS_10DLC_APPROVED: 'true',
-      WHATSAPP_META_APPROVED: 'true',
-    } as Env;
+    const live = { ...base, PROVIDER: 'telnyx' } as Env;
     expect(liveEnabled('telnyx', 'sms', live, true)).toBe(true);
     expect(liveEnabled('telnyx', 'whatsapp', live, true)).toBe(true);
-    // Each of the three conditions alone switches it off.
+    // The per-workspace registration status gates sending now, not these flags.
+    expect(
+      liveEnabled('telnyx', 'sms', { ...live, SMS_10DLC_APPROVED: 'false' } as Env, true),
+    ).toBe(true);
     expect(liveEnabled('telnyx', 'sms', live, false)).toBe(false);
     expect(liveEnabled('telnyx', 'sms', { ...live, PROVIDER: 'fake' } as Env, true)).toBe(false);
-    expect(liveEnabled('telnyx', 'sms', { ...live, SMS_10DLC_APPROVED: 'TRUE' } as Env, true)).toBe(
-      false,
-    );
-    expect(
-      liveEnabled(
-        'telnyx',
-        'whatsapp',
-        { ...live, WHATSAPP_META_APPROVED: undefined } as Env,
-        true,
-      ),
-    ).toBe(false);
   });
 });
 
 /** Sender numbers used only by this file; their telnyx routes are cleared before the run. */
-const LIVE_NUMBERS = Array.from({ length: 21 }, (_, i) => `+12025550${170 + i}`);
+const LIVE_NUMBERS = Array.from({ length: 22 }, (_, i) => `+12025550${170 + i}`);
 const num = (i: number) => LIVE_NUMBERS[i] as string;
 
 /** Telnyx selected for this deployment: the senders route only works there (ruling AI). */
@@ -434,7 +421,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
   it('answers 422 without a saved Telnyx credential', async () => {
     const r = await putSender(cookieB, 'sms', {});
     expect(r.status).toBe(422);
-    expect((await errorOf(r))?.message).toBe('Connect Telnyx first.');
+    expect((await errorOf(r))?.message).toBe('Connect your phone provider first.');
   });
 
   it('verifies the caller id, takes the status from the synced number, and routes it once', async () => {
@@ -442,13 +429,13 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     const { cookie, orgId } = await ownerWithCredential('snd-live', number);
     await setSynced(orgId, number, { tenDlcStatus: 'pending' });
 
-    // The synced 10DLC state decides for SMS: a status in the body is refused (ruling AR).
+    // The synced 10DLC state decides for SMS: a status in the body is refused.
     const typed = owningAll();
     const refused = await putSender(cookie, 'sms', { registrationStatus: 'approved' }, typed);
     expect(refused.status).toBe(400);
     expect(await errorOf(refused)).toEqual({
       code: 'validation_error',
-      message: 'registrationStatus: The SMS status comes from your synced numbers.',
+      message: 'registrationStatus: The status comes from your synced numbers.',
     });
     expect(typed.calls).toEqual([]);
     expect(await connectionsOf(orgId)).toEqual([]);
@@ -463,7 +450,8 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
       address: number,
       registrationStatus: 'pending',
       sandbox: false,
-      liveEnabled: false,
+      // Live on a Telnyx deployment with a credential; the pending status pauses the composer.
+      liveEnabled: true,
     });
 
     await setSynced(orgId, number, { tenDlcStatus: 'registered' });
@@ -484,57 +472,53 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     ]);
   });
 
-  it('sets a WhatsApp sender from a synced number Telnyx reports without WhatsApp (ruling AR)', async () => {
+  it('sets a WhatsApp sender with the status Meta gave the synced number', async () => {
     const number = num(8);
     const { cookie, orgId } = await ownerWithCredential('snd-wa', number, []);
-    // M4's Telnyx sync: SMS-capable, no WhatsApp capability, no Meta state.
-    await seedSyncedNumber(orgId, number, { whatsapp: false, whatsappStatus: 'none' });
+    await seedSyncedNumber(orgId, number, { whatsapp: true, whatsappStatus: 'pending' });
 
-    const untyped = owningAll();
-    const missing = await putSender(cookie, 'whatsapp', {}, untyped);
-    expect(missing.status).toBe(400);
-    expect(await errorOf(missing)).toEqual({
-      code: 'validation_error',
-      message: 'registrationStatus: Choose the WhatsApp registration status.',
-    });
-    expect(untyped.calls).toEqual([]);
-    const invalid = await putSender(cookie, 'whatsapp', { registrationStatus: 'verified' });
-    expect(invalid.status).toBe(400);
-    expect(await connectionsOf(orgId)).toEqual([]);
+    // The status comes from the sync: a status in the body is refused.
+    const typed = owningAll();
+    const refused = await putSender(cookie, 'whatsapp', { registrationStatus: 'approved' }, typed);
+    expect(refused.status).toBe(400);
+    expect(typed.calls).toEqual([]);
 
     const telnyx = owningAll();
-    const pending = await putSender(cookie, 'whatsapp', { registrationStatus: 'pending' }, telnyx);
+    const pending = await putSender(cookie, 'whatsapp', {}, telnyx);
     expect(pending.status).toBe(200);
     // Ownership is still checked live with the org's key.
     expect(telnyx.calls).toEqual(['/v2/phone_numbers']);
     const sender = bySms(await itemsOf(pending), 'whatsapp');
-    expect(sender).toMatchObject({ provider: 'telnyx', address: number });
-    expect(sender?.registrationStatus).toBe('pending');
+    expect(sender).toMatchObject({
+      provider: 'telnyx',
+      address: number,
+      registrationStatus: 'pending',
+    });
 
-    const approved = await putSender(cookie, 'whatsapp', { registrationStatus: 'approved' });
+    await setSynced(orgId, number, { whatsappStatus: 'approved' });
+    const approved = await putSender(cookie, 'whatsapp', {});
     expect(approved.status).toBe(200);
     const [row] = await connectionsOf(orgId);
     expect(row).toMatchObject({ id: sender?.id, registrationStatus: 'approved' });
     expect((await resolveWith('whatsapp', number))?.orgId).toBe(orgId);
-    expect((await auditsOf(orgId, 'allowed')).map((a) => a.metadata)).toEqual([
-      { channel: 'whatsapp', registrationStatus: 'pending' },
-      { channel: 'whatsapp', registrationStatus: 'approved' },
-    ]);
-    expect((await auditsOf(orgId, 'denied')).map((a) => a.metadata)).toEqual([
-      { reason: 'status_required', channel: 'whatsapp' },
-    ]);
+  });
+
+  it('refuses a WhatsApp sender on a number Telnyx does not list for WhatsApp', async () => {
+    const number = num(7);
+    const { cookie, orgId } = await ownerWithCredential('snd-wa-none', number, []);
+    await seedSyncedNumber(orgId, number, { whatsapp: false, whatsappStatus: 'none' });
+    const telnyx = owningAll();
+    const r = await putSender(cookie, 'whatsapp', {}, telnyx);
+    expect(r.status).toBe(422);
+    expect((await errorOf(r))?.code).toBe('number_not_synced');
+    expect(telnyx.calls).toEqual([]);
   });
 
   it('still refuses a WhatsApp number that is not in the Telnyx account', async () => {
     const number = num(9);
     const { cookie, orgId } = await ownerWithCredential('snd-wa-notown', number, []);
-    await seedSyncedNumber(orgId, number, { whatsapp: false });
-    const r = await putSender(
-      cookie,
-      'whatsapp',
-      { registrationStatus: 'approved' },
-      phoneNumbersFetch([]),
-    );
+    await seedSyncedNumber(orgId, number, { whatsapp: true });
+    const r = await putSender(cookie, 'whatsapp', {}, phoneNumbersFetch([]));
     expect(r.status).toBe(422);
     expect((await errorOf(r))?.code).toBe('number_not_owned');
     expect(await connectionsOf(orgId)).toEqual([]);
@@ -542,12 +526,12 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
 
   it('needs an address when the credential has no caller id, and checks it is E.164', async () => {
     const { cookie, orgId } = await ownerWithCredential('snd-addr', null, [num(2)]);
-    const status = { registrationStatus: 'not_started' };
-    const missing = await putSender(cookie, 'whatsapp', status);
+    await setSynced(orgId, num(2), { whatsappStatus: 'none' });
+    const missing = await putSender(cookie, 'whatsapp', {});
     expect(missing.status).toBe(400);
-    const bad = await putSender(cookie, 'whatsapp', { ...status, address: 'not a number' });
+    const bad = await putSender(cookie, 'whatsapp', { address: 'not a number' });
     expect(bad.status).toBe(400);
-    const good = await putSender(cookie, 'whatsapp', { ...status, address: '(202) 555-0172' });
+    const good = await putSender(cookie, 'whatsapp', { address: '(202) 555-0172' });
     expect(good.status).toBe(200);
     expect(bySms(await itemsOf(good), 'whatsapp')?.registrationStatus).toBe('not_started');
     expect((await routesOf(orgId)).map((r) => [r.channel, r.address])).toEqual([
@@ -633,7 +617,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     expect((await putSender(cookie, 'sms', {})).status).toBe(200);
     expect((await statuses())['Sandbox approved']).toBe('approved');
 
-    const r = await putSender(cookie, 'whatsapp', { registrationStatus: 'approved' });
+    const r = await putSender(cookie, 'whatsapp', {});
     expect(r.status).toBe(200);
     expect(await statuses()).toEqual({
       'Sandbox approved': 'pending',
@@ -672,9 +656,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
           .where(eq(messageTemplate.id, idOf('Sandbox approved'))),
       ),
     );
-    expect((await putSender(cookie, 'whatsapp', { registrationStatus: 'approved' })).status).toBe(
-      200,
-    );
+    expect((await putSender(cookie, 'whatsapp', {})).status).toBe(200);
     expect((await statuses())['Sandbox approved']).toBe('approved');
   });
 
@@ -696,7 +678,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
       expect(r.status, label).toBe(422);
       expect(await errorOf(r), label).toEqual({
         code: 'number_not_synced',
-        message: 'Sync your numbers, then choose an active Telnyx number.',
+        message: 'Sync your numbers, then choose an active number.',
       });
       expect(telnyx.calls, label).toEqual([]);
     }
@@ -709,7 +691,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
 
   it('refuses a synced number that cannot send on the channel', async () => {
     const { cookie, orgId } = await ownerWithCredential('snd-capable', num(11), []);
-    // No capability at all: neither channel. (WhatsApp ignores M4's `whatsapp: false` alone.)
+    // No capability at all: neither channel.
     await seedSyncedNumber(orgId, num(11), {
       voice: false,
       sms: false,
@@ -717,12 +699,12 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
       whatsapp: false,
     });
     for (const channel of ['sms', 'whatsapp'] as const) {
-      const body = channel === 'whatsapp' ? { registrationStatus: 'approved' } : {};
+      const body = {};
       const r = await putSender(cookie, channel, body);
       expect(r.status).toBe(422);
       expect(await errorOf(r)).toEqual({
         code: 'number_not_synced',
-        message: "This number can't send on this channel in Telnyx.",
+        message: "This number can't send on this channel yet.",
       });
     }
     expect(await connectionsOf(orgId)).toEqual([]);
@@ -739,7 +721,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     expect(r.status).toBe(422);
     expect(await errorOf(r)).toEqual({
       code: 'number_not_owned',
-      message: "This number isn't in your Telnyx account.",
+      message: "This number isn't in your phone provider account.",
     });
     expect(telnyx.calls).toEqual(['/v2/phone_numbers']);
     expect(await connectionsOf(orgId)).toEqual([]);
@@ -756,7 +738,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     expect(r.status).toBe(422);
     expect(await errorOf(r)).toEqual({
       code: 'provider_auth',
-      message: 'Telnyx did not accept the saved API key.',
+      message: 'Your phone provider did not accept the saved API key.',
     });
     expect(await connectionsOf(orgId)).toEqual([]);
     expect(await routesOf(orgId)).toEqual([]);
@@ -771,7 +753,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     expect(r.status).toBe(502);
     expect(await errorOf(r)).toEqual({
       code: 'internal_error',
-      message: 'Telnyx could not be reached. Try again in a moment.',
+      message: 'Your phone provider could not be reached. Try again in a moment.',
     });
     expect(await connectionsOf(orgId)).toEqual([]);
   });
@@ -789,7 +771,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     expect(r.status).toBe(502);
     expect(await errorOf(r)).toEqual({
       code: 'internal_error',
-      message: 'Telnyx could not be reached. Try again in a moment.',
+      message: 'Your phone provider could not be reached. Try again in a moment.',
     });
     expect(calls).toEqual(['/v2/phone_numbers']);
     expect(signal).toBeInstanceOf(AbortSignal);
@@ -817,7 +799,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     expect(r.status).toBe(409);
     expect(await errorOf(r)).toEqual({
       code: 'credential_changed',
-      message: 'The Telnyx connection changed while saving. Try again.',
+      message: 'Your phone connection changed while saving. Try again.',
     });
     expect(await connectionsOf(orgId)).toEqual([]);
     expect(await routesOf(orgId)).toEqual([]);
@@ -879,9 +861,7 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
     async function liveSenders(label: string, number: string) {
       const owner = await ownerWithCredential(label, number);
       expect((await putSender(owner.cookie, 'sms', {})).status).toBe(200);
-      expect(
-        (await putSender(owner.cookie, 'whatsapp', { registrationStatus: 'approved' })).status,
-      ).toBe(200);
+      expect((await putSender(owner.cookie, 'whatsapp', {})).status).toBe(200);
       expect((await resolveWith('sms', number))?.orgId).toBe(owner.orgId);
       expect((await resolveWith('whatsapp', number))?.orgId).toBe(owner.orgId);
       return owner;
@@ -965,22 +945,71 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
       expect(await resolveWith('sms', number)).toBeNull();
     });
 
-    it("keeps a WhatsApp sender and the owner's status through a sync without WhatsApp", async () => {
+    it('takes the WhatsApp status from the sync, and keeps it through an unread WhatsApp sync', async () => {
       const number = num(18);
       const { cookie, orgId } = await ownerWithCredential('snd-sync-wa', number);
-      expect((await putSender(cookie, 'whatsapp', { registrationStatus: 'approved' })).status).toBe(
-        200,
-      );
-      // M4's Telnyx sync reports no WhatsApp capability and no Meta state (ruling AR).
-      await syncAs(orgId, 'telnyx', listing([{ e164: number, tenDlc: 'failed' }]));
-      const [kept] = await connectionsOf(orgId);
-      expect(kept).toMatchObject({ channel: 'whatsapp', registrationStatus: 'approved' });
+      expect((await putSender(cookie, 'whatsapp', {})).status).toBe(200);
+      const wa = (state: 'approved' | 'pending' | 'none', synced = true): NumbersProvider => ({
+        listNumbers: async () => [
+          {
+            providerNumberId: `tn-${number.slice(1)}`,
+            e164: number,
+            status: 'active' as const,
+            capabilities: { voice: true, sms: true, mms: true, whatsapp: state !== 'none' },
+            tenDlc: 'registered' as const,
+            whatsapp: state,
+            ...(synced ? {} : { whatsappSynced: false }),
+          },
+        ],
+      });
+      await syncAs(orgId, 'telnyx', wa('pending'));
+      expect((await connectionsOf(orgId))[0]).toMatchObject({
+        channel: 'whatsapp',
+        registrationStatus: 'pending',
+      });
+      await syncAs(orgId, 'telnyx', wa('approved'));
+      expect((await connectionsOf(orgId))[0]?.registrationStatus).toBe('approved');
+
+      // The provider's WhatsApp facts could not be read: the sender and its status stay.
+      await syncAs(orgId, 'telnyx', wa('none', false));
+      expect((await connectionsOf(orgId))[0]?.registrationStatus).toBe('approved');
       expect((await resolveWith('whatsapp', number))?.orgId).toBe(orgId);
 
-      // The number is no longer an active synced Telnyx number: the sender goes.
-      await syncAs(orgId, 'telnyx', listing([]));
+      // Telnyx says the number is no longer a WhatsApp number: the sender goes.
+      await syncAs(orgId, 'telnyx', wa('none'));
       expect(await connectionsOf(orgId)).toEqual([]);
       expect(await resolveWith('whatsapp', number)).toBeNull();
+    });
+
+    it('makes an approved WhatsApp number the WhatsApp sender automatically', async () => {
+      const number = num(21);
+      const { orgId } = await ownerWithCredential('snd-sync-auto', number, []);
+      await syncAs(orgId, 'telnyx', {
+        listNumbers: async () => [
+          {
+            providerNumberId: `tn-${number.slice(1)}`,
+            e164: number,
+            status: 'active' as const,
+            capabilities: { voice: true, sms: true, mms: true, whatsapp: true },
+            tenDlc: 'none' as const,
+            whatsapp: 'approved' as const,
+            whatsappDetail: { displayName: 'Example Repairs', qualityRating: 'GREEN' },
+          },
+        ],
+      });
+      expect(
+        (await connectionsOf(orgId)).map((c) => [c.channel, c.address, c.registrationStatus]),
+      ).toEqual([['whatsapp', number, 'approved']]);
+      expect((await resolveWith('whatsapp', number))?.orgId).toBe(orgId);
+      const [synced] = await withAppDb((db) =>
+        withTenant(db, orgId, (tx) =>
+          tx.select().from(phoneNumber).where(eq(phoneNumber.e164, number)),
+        ),
+      );
+      expect(synced).toMatchObject({
+        whatsappDisplayName: 'Example Repairs',
+        whatsappQualityRating: 'GREEN',
+      });
     });
 
     it('drops an SMS sender whose synced number lost SMS', async () => {
@@ -989,7 +1018,8 @@ describe('PUT /api/v1/messaging/senders/{channel}', () => {
       expect((await putSender(cookie, 'sms', {})).status).toBe(200);
       await setSynced(orgId, number, { sms: false });
       await withAppDb((db) => withTenant(db, orgId, (tx) => refreshTelnyxSenders(tx)));
-      expect(await connectionsOf(orgId)).toEqual([]);
+      // The number still sends WhatsApp, so it becomes the WhatsApp sender; SMS is gone.
+      expect((await connectionsOf(orgId)).map((c) => c.channel)).toEqual(['whatsapp']);
       expect(await resolveWith('sms', number)).toBeNull();
     });
 
@@ -1035,12 +1065,9 @@ describe('smsRegistration and sendableFor', () => {
     expect(sendableFor(row({ provider: 'fake' }), 'sms')).toBe('not_synced');
     expect(sendableFor(undefined, 'sms')).toBe('not_synced');
     expect(sendableFor(row({ sms: false }), 'sms')).toBe('not_capable');
-    // WhatsApp: M4's `whatsapp: false` is not evidence; any capability will do (ruling AR).
-    expect(sendableFor(row({ whatsapp: false }), 'whatsapp')).toBe('ok');
-    expect(sendableFor(row({ whatsapp: false, sms: false, mms: false }), 'whatsapp')).toBe('ok');
-    expect(
-      sendableFor(row({ voice: false, sms: false, mms: false, whatsapp: false }), 'whatsapp'),
-    ).toBe('not_capable');
+    // WhatsApp: the sync reads the account's WhatsApp numbers, so `whatsapp` is the evidence.
+    expect(sendableFor(row({}), 'whatsapp')).toBe('ok');
+    expect(sendableFor(row({ whatsapp: false }), 'whatsapp')).toBe('not_capable');
   });
 });
 

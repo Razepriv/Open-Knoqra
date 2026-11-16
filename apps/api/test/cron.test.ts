@@ -45,6 +45,23 @@ afterAll(async () => {
 });
 
 describe('handleScheduled', () => {
+  it('runs every job on the expression, each recorded, even after one fails', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const failure = new Error('first job exploded');
+    const first = job('first', async () => {
+      throw failure;
+    });
+    const secondRun = vi.fn(async () => undefined);
+    const second = job('second', secondRun);
+    await expect(handleScheduled(controller(EVERY_FIVE), env, ctx, [first, second])).rejects.toBe(
+      failure,
+    );
+    expect(secondRun).toHaveBeenCalledTimes(1);
+    expect((await readRun(first.name))?.lastStatus).toBe('error');
+    expect((await readRun(second.name))?.lastStatus).toBe('ok');
+  });
+
   it('records a successful run as ok with its duration', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const run = vi.fn(async () => undefined);
@@ -122,11 +139,13 @@ describe('handleScheduled', () => {
 });
 
 describe('CRON_JOBS', () => {
-  it('registers the stale-call sweep, balance poll and reconcile jobs on the planned crons', () => {
+  it('registers the planned jobs on their crons', () => {
     expect(CRON_JOBS.map((j) => [j.name, j.cron])).toEqual([
       ['stale-call-sweep', '*/5 * * * *'],
       ['balance-poll', '*/30 * * * *'],
       ['ledger-reconcile', '15 3 * * *'],
+      ['message-dispatch-sweep', '*/5 * * * *'],
+      ['messaging-status', '*/30 * * * *'],
     ]);
   });
 });

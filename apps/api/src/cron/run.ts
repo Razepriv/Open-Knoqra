@@ -72,9 +72,10 @@ export function cronJobsOf(env: Pick<Env, 'EXTENSIONS'>): readonly CronJob[] {
 }
 
 /**
- * The Worker's `scheduled` handler. Finds the job for the trigger's cron expression (core or
- * extension) and records each run in `cron_run` for the health check. A failure is logged,
- * reported and rethrown, so Cloudflare (and Sentry's cron monitor) mark the invocation failed.
+ * The Worker's `scheduled` handler. Runs every job (core or extension) on the trigger's cron
+ * expression, in order, and records each run in `cron_run` for the health check. A failure is
+ * logged, reported and rethrown, so Cloudflare (and Sentry's cron monitor) mark the invocation
+ * failed.
  */
 export async function handleScheduled(
   controller: ScheduledController,
@@ -83,25 +84,36 @@ export async function handleScheduled(
   jobs: readonly CronJob[] = cronJobsOf(env),
 ): Promise<void> {
   configureLogging({ appEnv: env.APP_ENV });
-  const job = jobs.find((candidate) => candidate.cron === controller.cron);
-  if (!job) {
+  const matching = jobs.filter((candidate) => candidate.cron === controller.cron);
+  if (matching.length === 0) {
     logger.warn('cron.unknown', { cron: controller.cron });
     return;
   }
-  const started = Date.now();
   let handle: DbHandle | null = null;
+  let firstError: { error: unknown } | null = null;
   try {
     // Inside the guard: a missing or broken connection setting is a failed run too.
     handle = createDb(connectionString(env));
-    await runRecorded(handle.db, job, env, ctx);
-    logger.info('cron.completed', { name: job.name, durationMs: Date.now() - started });
+    for (const job of matching) {
+      const started = Date.now();
+      try {
+        await runRecorded(handle.db, job, env, ctx);
+        logger.info('cron.completed', { name: job.name, durationMs: Date.now() - started });
+      } catch (error) {
+        // One job's failure must not skip the others on the same expression.
+        logger.error('cron.failed', { name: job.name, error });
+        reportError(error, { where: 'cron' });
+        firstError ??= { error };
+      }
+    }
   } catch (error) {
-    logger.error('cron.failed', { name: job.name, error });
+    logger.error('cron.failed', { name: matching[0]?.name, error });
     reportError(error, { where: 'cron' });
     throw error;
   } finally {
     await handle?.close().catch((error: unknown) => logger.warn('db.close_failed', { error }));
   }
+  if (firstError) throw firstError.error;
 }
 
 /**

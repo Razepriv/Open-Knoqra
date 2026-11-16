@@ -1,5 +1,6 @@
 import { createDb, type Database } from '@knoqra/db';
 import { connectionString, type Env } from '../env';
+import { guardOutboundCall } from '../events/call-guard';
 import { claimRawEvent, markIgnored, markParked, rawEventStatus } from '../events/raw-event';
 import { dispatch, normalizerFor } from '../events/registry';
 import { configureLogging, logger } from '../lib/logger';
@@ -8,18 +9,30 @@ import { reportError } from '../observability/report';
 
 type Outcome = 'skipped' | 'ignored' | 'parked' | 'processed';
 
+/** For tests: no network in tests. */
+export interface ConsumerDeps {
+  fetch?: typeof fetch;
+}
+
 /** A receipt can beat its own send's commit; give the send a moment before the next attempt. */
 const NOT_YET_KNOWN_RETRY_SECONDS = 2;
 
 /**
  * One delivery of one raw provider event:
  * 1. claim the row (attempts + 1) while it is pending or parked; a missing or final row is a no-op
+ * 1b. the call guard: an outgoing call that dials an emergency number or that the API did not
+ *    authorize is hung up and recorded here (events/call-guard.ts), and goes no further
  * 2. normalize the stored body; nothing to apply marks it ignored
  * 3. run the handler (calls or messages); parked records the reason, ignored marks the row final
  *    with nothing applied, processed commits with the handler's changes
  * 4. run the handler's best-effort side effects after commit
  */
-async function processRawEvent(db: Database, env: Env, rawEventId: string): Promise<Outcome> {
+async function processRawEvent(
+  db: Database,
+  env: Env,
+  rawEventId: string,
+  deps: ConsumerDeps,
+): Promise<Outcome> {
   const raw = await claimRawEvent(db, rawEventId);
   if (!raw) {
     const status = await rawEventStatus(db, rawEventId);
@@ -27,16 +40,24 @@ async function processRawEvent(db: Database, env: Env, rawEventId: string): Prom
     else logger.debug('queue.skipped_final', { rawEventId, status });
     return 'skipped';
   }
+  const connectorOrgId = raw.organizationId ?? null;
+  const guard = await guardOutboundCall(
+    { env, db, rawEventId, connectorOrgId, ...(deps.fetch ? { fetch: deps.fetch } : {}) },
+    raw.provider,
+    raw.body,
+  );
+  if (guard.kind === 'blocked') return 'processed';
+  if (guard.kind === 'refused') {
+    await markIgnored(db, rawEventId);
+    return 'ignored';
+  }
   const event = normalizerFor(raw.provider, env)?.normalize(raw.body) ?? null;
   if (event === null) {
     await markIgnored(db, rawEventId);
     logger.debug('queue.ignored', { rawEventId, provider: raw.provider });
     return 'ignored';
   }
-  const result = await dispatch(
-    { env, db, rawEventId, connectorOrgId: raw.organizationId ?? null },
-    event,
-  );
+  const result = await dispatch({ env, db, rawEventId, connectorOrgId }, event);
   if (result.status === 'parked') {
     await markParked(db, rawEventId, result.reason);
     logger.info('queue.parked', { rawEventId, provider: raw.provider, reason: result.reason });
@@ -65,13 +86,14 @@ async function processRawEvent(db: Database, env: Env, rawEventId: string): Prom
 export async function handleProviderEvents(
   batch: MessageBatch<{ rawEventId: string }>,
   env: Env,
+  deps: ConsumerDeps = {},
 ): Promise<void> {
   configureLogging({ appEnv: env.APP_ENV });
   const { db, close } = createDb(connectionString(env));
   try {
     for (const msg of batch.messages) {
       try {
-        await processRawEvent(db, env, msg.body.rawEventId);
+        await processRawEvent(db, env, msg.body.rawEventId, deps);
         msg.ack();
       } catch (error) {
         if (error instanceof MessageNotYetKnownError) {

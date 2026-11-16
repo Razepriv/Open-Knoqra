@@ -299,16 +299,17 @@ They apply **per channel**. START records the permission source `inbound_start` 
 
 ### Sending and gating
 
-`sendMessage` (`messaging/send.ts`) is idempotent per organization on `clientMessageId`: a replay, even a concurrent one, returns the first message and never calls the provider again. Step one runs in one tenant transaction (lock the conversation, recompute the composer, reserve the message's cost, insert the `queued` message, audit). A merge locks the same rows in the other order, so a lost deadlock runs step one once more (`retryOnConflict`). Step two calls the provider outside any transaction and never throws. Its answer is recorded in a third transaction, also retried, so a message the provider answered never stays queued with its hold.
+`sendMessage` (`messaging/send.ts`) is idempotent per organization on `clientMessageId`: a replay, even a concurrent one, returns the first message and never calls the provider again. Step one runs in one tenant transaction (lock the conversation, recompute the composer, reserve the message's cost, insert the `queued` message with its provider request in `dispatch_payload`, audit). A merge locks the same rows in the other order, so a lost deadlock runs step one once more (`retryOnConflict`). The route then answers 201 with the queued message.
+
+Step two runs after the response (`waitUntil`, on its own database handle): `dispatchMessage` claims the message (`dispatch_claimed_at` set while null and the status queued), so exactly one worker calls the provider, with the message id as the `Idempotency-Key`. The answer is recorded in a third transaction, also retried, so a message the provider answered never stays queued with its hold, and the result is published (`message.updated`, `conversation.updated`). The cron job `message-dispatch-sweep` sends messages no worker claimed within a minute, and fails messages claimed but unanswered after ten minutes ("Sending was interrupted"), never resending blindly.
 
 A Telnyx sender is live only when all of these hold:
 
 1. The deployment runs `PROVIDER=telnyx`.
 2. The workspace has saved a Telnyx credential (Settings, Voice, or the setup wizard).
-3. The channel's flag is exactly `"true"`: `SMS_10DLC_APPROVED` for SMS, `WHATSAPP_META_APPROVED` for WhatsApp.
-4. The sender's `registration_status` is `approved`.
+3. The sender's `registration_status` is `approved`, which the number sync reads from the workspace's own provider account: 10DLC for SMS, Meta's approval for WhatsApp.
 
-The first three make `liveEnabled` (`messaging/senders.ts`) true; the composer checks the fourth. Until all four hold the composer stays paused. The `fake` provider is live-enabled wherever the fake webhook secret is set and the environment is not production.
+The first two make `liveEnabled` (`messaging/senders.ts`) true; the composer checks the third. Until all three hold the composer stays paused. The deployment-wide `SMS_10DLC_APPROVED` and `WHATSAPP_META_APPROVED` flags are retired and ignored. The `fake` provider is live-enabled wherever the fake webhook secret is set and the environment is not production.
 
 For each Telnyx send, `messagingProviderFor` decrypts the vault key in memory for that one send. It is never cached or logged. A credential row that exists but cannot be opened (a missing or changed master key) still counts as saved, so the composer reads free while the send answers 422 `send_paused`.
 
@@ -321,18 +322,20 @@ For each Telnyx send, `messagingProviderFor` decrypts the vault key in memory fo
 The route checks, in order:
 
 1. `PROVIDER` is `telnyx` (otherwise 422) and a Telnyx credential is saved (otherwise 422).
-2. The number is an `active` Telnyx number in the last Numbers sync (M4). SMS needs the number's SMS capability. WhatsApp accepts any capability, because the sync never reports WhatsApp. Otherwise 422 `number_not_synced`.
+2. The number is an `active` Telnyx number in the last Numbers sync (M4). SMS needs the number's SMS capability, WhatsApp its WhatsApp capability (the sync reads the account's WhatsApp numbers). Otherwise 422 `number_not_synced`.
 3. Telnyx confirms, with the workspace's own key and outside any transaction, that the number is in that account (`GET /v2/phone_numbers`, 10 second limit). Only status `active` or `port-out-pending` counts; anything else answers 422 `number_not_owned`. A key Telnyx rejects answers 422 `provider_auth`, and an unreachable Telnyx 502.
 4. The write takes the Numbers lock and checks that the saved key is still the one just verified (otherwise 409 `credential_changed`). It writes the connection and its `channel_route`. A number already routed to another workspace answers a generic 409 that does not reveal it. A new address replaces the connection, so the old route goes with it.
 
 The registration status depends on the channel:
 
-- **SMS** follows the number's 10DLC state in Numbers: `registered` or `not_required` is `approved`, `pending` is `pending`, `failed` is `rejected`, and `none` is `not_started`. A status in the request body is refused with 400.
-- **WhatsApp** needs a status in the body, set by the owner or admin, until Numbers can read WhatsApp state from Telnyx. Nothing checks it against Meta, so `WHATSAPP_META_APPROVED` stays the deployment gate.
+- **SMS** follows the number's 10DLC state in Numbers: `registered` or `not_required` is `approved`, `pending` is `pending`, `failed` is `rejected`, and `none` is `not_started`.
+- **WhatsApp** follows Meta's verdict, which the Telnyx sync reads from `GET /v2/whatsapp/phone_numbers` and `GET /v2/whatsapp/business_accounts`: a `CONNECTED` number on an account whose review is `APPROVED` is `approved`; a rejected review or a `BANNED` or `DELETED` number is `rejected`; anything else is `pending`. A 404 on those reads means no WhatsApp numbers; any other failure (an outage, or a restricted key's 401 or 403) keeps what the last sync knew, so a live WhatsApp sender is never dropped by a read that failed.
+
+A status in the request body is refused with 400 on both channels.
 
 Senders follow the account:
 
-- Every Telnyx number sync refreshes the senders in the same transaction. A sender whose number is gone or no longer `active` is deleted with its route, and so is an SMS sender whose number lost SMS. An SMS sender takes the new 10DLC status. A WhatsApp sender keeps the status its owner set.
+- Every Telnyx number sync refreshes the senders in the same transaction. A sender whose number is gone, no longer `active`, or no longer capable on its channel is deleted with its route. Every other sender takes its number's new status. A channel with no sender gets one automatically: the account's WhatsApp number (approved first, then the caller id), and for SMS the number the SMS Enable flow registered. The cron job `messaging-status` re-syncs every connected workspace every 30 minutes.
 - Removing the Telnyx connection, or saving a different API key, deletes the workspace's Telnyx senders and their routes in the same transaction. Sandbox senders stay. After reconnecting, save the senders again.
 
 ### Templates, notes and message costs

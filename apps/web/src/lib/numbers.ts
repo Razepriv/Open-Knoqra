@@ -37,7 +37,7 @@ export function useSyncNumbers() {
     mutationFn: async () =>
       throwIfFailed(
         await api.POST('/api/v1/numbers/sync'),
-        'Could not sync your numbers from Telnyx.',
+        'Could not sync your numbers from your phone provider.',
       ),
     onSuccess: (result) => {
       queryClient.setQueryData(numbersKey, result.items);

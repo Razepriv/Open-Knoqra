@@ -17,6 +17,7 @@ import { ensureConversation, insertMessage } from '../src/messaging/store';
 import { handleProviderEvents } from '../src/queue/consumer';
 import { ingestWebhook } from '../src/routes/webhooks';
 import { api, get, post, signUp, uniqueEmail, withAdminDb, withAppDb } from './helpers';
+import { eventually } from './messaging-helpers';
 
 type Envelope<T> = { data: T | null; error: { code: string; message: string } | null };
 type Msg = { id: string; status: string; providerMessageId: string | null };
@@ -102,10 +103,20 @@ async function sendText(org: Org, conversationId: string, text = 'Your table is 
   return { status: r.status, body: (await r.json()) as Envelope<Msg> };
 }
 
+/**
+ * Sends over HTTP and waits for the provider's answer: the route answers once the message is
+ * stored, and the provider send (and its id) lands after the response.
+ */
 async function sentMessage(org: Org, t: Thread): Promise<Msg> {
   const r = await sendText(org, t.conversationId);
   expect(r.status).toBe(201);
-  return r.body.data as Msg;
+  const queued = r.body.data as Msg;
+  return eventually(
+    async () =>
+      ((await (await get(`/api/v1/messages/${queued.id}`, org.cookie)).json()) as Envelope<Msg>)
+        .data as Msg,
+    (m) => m.providerMessageId !== null,
+  );
 }
 
 const tenantOf = (org: Org) => ({ orgId: org.orgId, userId: org.userId, role: 'owner' });

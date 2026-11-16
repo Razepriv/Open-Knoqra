@@ -128,8 +128,9 @@ const BLOCKED_COPY: Record<string, string> = {
 const SPEND_COPY: Record<string, string> = {
   insufficient_funds: 'Not enough credit for this call. Add credit to continue.',
   stop_cap: 'This call would pass the monthly spend cap.',
-  provider_low: 'Your Telnyx balance is low. Top it up in Telnyx to keep calling.',
-  provider_exhausted: 'Your Telnyx balance is too low to place a call. Top it up in Telnyx.',
+  provider_low: 'Your phone provider balance is low. Top it up with your provider to keep calling.',
+  provider_exhausted:
+    'Your phone provider balance is too low to place a call. Top it up with your provider.',
 };
 
 const ERROR_COPY: Record<string, string> = {

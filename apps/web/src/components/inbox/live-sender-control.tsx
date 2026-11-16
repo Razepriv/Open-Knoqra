@@ -26,16 +26,14 @@ export const REGISTRATION_LABEL: Record<RegistrationStatus, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
 };
-const STATUSES = Object.keys(REGISTRATION_LABEL) as RegistrationStatus[];
 
 const select = `h-[30px] min-w-0 flex-1 cursor-pointer rounded-full border border-[color:var(--pillBorder)] bg-[color:var(--pill)] px-3 text-[12.5px] text-[color:var(--text)] [box-shadow:var(--pillShadow)] ${focusRing}`;
 
 /**
- * Owners and admins with a saved Telnyx connection, on a deployment that sends through Telnyx: use
- * the number as the live sender of a channel. The SMS registration status follows the number's
- * 10DLC state in Numbers (ruling AQ). The WhatsApp one is set here until Numbers can read Meta's
- * approval (ruling AR). Hidden for everyone else. The form waits for both the connection and the
- * senders, so the WhatsApp status select never starts from a guess.
+ * Owners and admins with a saved phone provider connection, on a live deployment: use a number as
+ * the live sender of a channel. Both channels' registration status comes from the provider (US
+ * texting registration for SMS, Meta's approval for WhatsApp), read by the sync; nobody sets it
+ * here. Hidden for everyone else.
  */
 export function LiveSenderControl({ channel }: { channel: InboxChannel }) {
   const me = useMe();
@@ -75,22 +73,20 @@ function LiveSenderForm({
 }) {
   const save = useSetLiveSender();
   const baseId = useId();
-  const savedWhatsApp =
-    senders.find((s) => s.channel === 'whatsapp' && s.provider === 'telnyx')?.registrationStatus ??
-    'pending';
   const [channel, setChannel] = useState<InboxChannel>(initialChannel);
-  const [status, setStatus] = useState<RegistrationStatus | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const statusRule = liveSenderStatus(channel);
-  const value = status ?? savedWhatsApp;
+  const current = senders.find((s) => s.channel === channel && s.provider === 'telnyx');
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     setMessage(null);
-    save.mutate(statusRule.settable ? { channel, registrationStatus: value } : { channel }, {
-      onSuccess: () => setMessage({ ok: true, text: 'Live sender saved.' }),
-      onError: (error) => setMessage({ ok: false, text: liveSenderErrorCopy(error) }),
-    });
+    save.mutate(
+      { channel },
+      {
+        onSuccess: () => setMessage({ ok: true, text: 'Live sender saved.' }),
+        onError: (error) => setMessage({ ok: false, text: liveSenderErrorCopy(error) }),
+      },
+    );
   }
 
   return (
@@ -107,10 +103,7 @@ function LiveSenderForm({
         <select
           id={`${baseId}-channel`}
           value={channel}
-          onChange={(e) => {
-            setChannel(e.target.value as InboxChannel);
-            setStatus(null);
-          }}
+          onChange={(e) => setChannel(e.target.value as InboxChannel)}
           className={select}
         >
           {CHANNELS.map((ch) => (
@@ -119,27 +112,11 @@ function LiveSenderForm({
             </option>
           ))}
         </select>
-        {statusRule.settable ? (
-          <>
-            <label htmlFor={`${baseId}-status`} className="sr-only">
-              WhatsApp registration status
-            </label>
-            <select
-              id={`${baseId}-status`}
-              value={value}
-              onChange={(e) => setStatus(e.target.value as RegistrationStatus)}
-              className={select}
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {REGISTRATION_LABEL[s]}
-                </option>
-              ))}
-            </select>
-          </>
-        ) : null}
       </div>
-      <p className="text-[12px] text-[color:var(--muted)] leading-[1.35]">{statusRule.note}</p>
+      <p className="text-[12px] text-[color:var(--muted)] leading-[1.35]">
+        {current ? `${REGISTRATION_LABEL[current.registrationStatus]}. ` : ''}
+        {liveSenderStatus(channel).note}
+      </p>
       <div className="flex items-center gap-2">
         <button
           type="submit"

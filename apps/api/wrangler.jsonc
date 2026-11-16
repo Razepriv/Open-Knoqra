@@ -46,6 +46,10 @@
       { "name": "USER_CALL_LOCK", "class_name": "UserCallLock" }
     ]
   },
+  // Message attachments (WhatsApp images, voice notes, files). Optional: without the binding,
+  // uploads answer 503 and inbound files show as unavailable. Create it with
+  // `wrangler r2 bucket create knoqra-media` (docs/self-host.md).
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "knoqra-media" }],
   // No top-level "ratelimits": local dev and the test pool run from this block, and a simulated
   // limiter there would throttle suites that sign up and dial freely. Without a binding the rule
   // lets every request through (src/lib/rate-limit.ts). Deployed configs declare them.

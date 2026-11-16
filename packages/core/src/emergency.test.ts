@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMERGENCY_CALL_MESSAGE, isEmergencyNumber } from './emergency';
+import { EMERGENCY_CALL_MESSAGE, emergencyCode, isEmergencyNumber } from './emergency';
 
 describe('isEmergencyNumber', () => {
   it.each([
@@ -54,5 +54,30 @@ describe('isEmergencyNumber', () => {
   it('explains where to call instead', () => {
     expect(EMERGENCY_CALL_MESSAGE).toContain('112');
     expect(EMERGENCY_CALL_MESSAGE).toContain('911');
+  });
+});
+
+describe('emergencyCode', () => {
+  it.each([
+    ['911', '911'],
+    ['+1911', '911'],
+    ['+91112', '112'],
+    ['sip:911@sip.telnyx.com', '911'],
+    ['sips:+1911@sip.telnyx.com;user=phone', '911'],
+    ['SIP:112@example.org', '112'],
+    ['tel:988', '988'],
+    ['sip:411@example.org', '411'],
+  ])('reads %j as %j', (input, code) => {
+    expect(emergencyCode(input)).toBe(code);
+  });
+
+  it.each([
+    '+12025550123',
+    'sip:+12025550123@sip.telnyx.com',
+    'sip:alice@example.org',
+    'sip:@example.org',
+    'mailto:911@example.org',
+  ])('reads %j as no code', (input) => {
+    expect(emergencyCode(input)).toBeNull();
   });
 });

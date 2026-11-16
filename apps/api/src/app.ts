@@ -32,8 +32,10 @@ import { health } from './routes/health';
 import { healthDeep } from './routes/health-deep';
 import { licenseGate, licenseRoutes } from './routes/license';
 import { me } from './routes/me';
+import { media, mediaFile } from './routes/media';
 import { messageTemplates } from './routes/message-templates';
 import { messages } from './routes/messages';
+import { messagingChannels } from './routes/messaging-channels';
 import { messagingSenders } from './routes/messaging-senders';
 import { notifications } from './routes/notifications';
 import { numberPurchase } from './routes/number-purchase';
@@ -134,6 +136,10 @@ export function createApp(extensions: readonly ApiExtension[] = []): OpenAPIHono
   app.on('POST', UNSUBSCRIBE_PATH, requestDb);
   app.route('/', emailUnsubscribe);
 
+  // Message files behind signed, short-lived links: no session (routes/media.ts).
+  app.use('/api/media/*', requestDb);
+  app.route('/', mediaFile);
+
   // Durable per-address limits on the auth routes that guess or spend a secret. Registered before
   // the database chain, so a limited request opens no connection. Exact paths only: Better Auth
   // answers any other spelling of these paths (trailing slash, doubled slash, other case) with 404.
@@ -170,9 +176,11 @@ export function createApp(extensions: readonly ApiExtension[] = []): OpenAPIHono
   app.route('/', today);
   app.route('/', todayPrefs);
   app.route('/', messagingSenders);
+  app.route('/', messagingChannels);
   app.route('/', messageTemplates);
   app.route('/', conversations);
   app.route('/', messages);
+  app.route('/', media);
   app.route('/', voice);
   app.route('/', connectors);
   app.route('/', walletRoutes);

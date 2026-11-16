@@ -72,7 +72,7 @@ It runs these steps in order:
 | Step | What it does |
 | --- | --- |
 | `db` | Creates the `knoqra_app` login role (no superuser, no row-level security bypass) or updates its password, then runs the database migrations with the owner login. |
-| `cloudflare` | Creates or updates the Hyperdrive config `knoqra` (caching off) for the `knoqra_app` login, and creates the queues `knoqra-provider-events` and `knoqra-provider-events-dlq`. |
+| `cloudflare` | Creates or updates the Hyperdrive config `knoqra` (caching off) for the `knoqra_app` login, creates the queues `knoqra-provider-events` and `knoqra-provider-events-dlq`, and creates the R2 bucket `knoqra-media` for WhatsApp images, voice notes and files. |
 | `config` | Writes `apps/api/wrangler.selfhost.jsonc` and `apps/web/wrangler.selfhost.jsonc`. |
 | `api` | Deploys the API Worker, `knoqra-api`. |
 | `secrets` | Sets the API Worker's secrets. Only their names are printed. |
@@ -90,7 +90,12 @@ Hyperdrive caching stays off because cached reads would ignore each workspace's 
    - Copy the key and paste it on the license screen. If you gave it to setup, the Desk is already unlocked.
    - The key is not a software license: your rights to the code come from the [AGPL-3.0](../LICENSE). See [licensing.md](licensing.md) for how the key works.
 3. **Connect your provider** in Settings › Connectors.
-4. **Follow the Setup page** to add phone numbers and set up WhatsApp.
+4. **Follow the Setup page** to add phone numbers.
+5. **Enable messaging** in the Inbox, under Channels:
+   - **SMS:** press Enable and fill in your business details. KNOQRA registers your number for US business texting (10DLC) with your own Telnyx account: brand, campaign and number. Telnyx bills the registration fees. Sending switches on when carriers approve it, usually within 1 to 3 business days.
+   - **WhatsApp:** connect a WhatsApp Business number in the Telnyx portal, then press Enable and Check again. KNOQRA finds the number and shows it as live once Meta approves it.
+
+WhatsApp files are stored in the R2 bucket `knoqra-media`. To create it by hand: `wrangler r2 bucket create knoqra-media`. Without the bucket, uploads answer 503 and inbound files show as unavailable. Outbound files are fetched by Telnyx from your API address, so `API_PUBLIC_ORIGIN` (set by `pnpm knoqra deploy`) must be your public `https://` API address.
 
 Telnyx webhooks go to `https://api.example.com/webhooks/telnyx` (your API address). The Desk shows the exact webhook URLs for each connection, including Plivo's answer URL.
 

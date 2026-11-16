@@ -19,6 +19,8 @@ export interface HandlerContext {
    * for the platform URL. A handler must not apply such an event to any other organization.
    */
   connectorOrgId: string | null;
+  /** Tests only: the fetch provider clients use after commit (inbound file downloads). */
+  fetch?: typeof fetch;
 }
 
 /**

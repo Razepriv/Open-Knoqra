@@ -31,6 +31,10 @@ export const phoneNumber = pgTable(
     })
       .notNull()
       .default('unassigned'),
+    /** WhatsApp's display name for the number, as the last sync read it. */
+    whatsappDisplayName: text('whatsapp_display_name'),
+    /** WhatsApp's quality rating (GREEN, YELLOW, RED, NA), as the last sync read it. */
+    whatsappQualityRating: text('whatsapp_quality_rating'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: timestamp('updated_at', { withTimezone: true })

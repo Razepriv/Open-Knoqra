@@ -9,21 +9,30 @@ import {
   type Contact,
   contact,
   contactPermissionEvent,
+  type Database,
+  type MessageAttachment,
   type MessageProvider,
   message,
+  messageAttachment,
+  messageReaction,
   providerEventRaw,
   type Tx,
   timelineEvent,
   withTenant,
 } from '@knoqra/db';
 import type { MessageEventPayload, ProviderEvent } from '@knoqra/providers';
-import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import type { Env } from '../env';
 import { FOREIGN_CONNECTION, mayApplyTo } from '../events/connector-guard';
 import type { EventHandler, HandlerResult } from '../events/registry';
 import { findContact } from '../lib/contact-access';
 import { logger } from '../lib/logger';
 import { latestPermissionEvents } from '../lib/permissions';
+import { publish } from '../lib/realtime';
+import { downloadInbound, recordDownload } from './attachments';
 import { resolveRoute } from './routing';
+import { loadMessageJson, publishMessage } from './send';
+import { telnyxMessagingClient } from './senders';
 import { applyReceipt, ensureConversation, insertMessage } from './store';
 
 /** A receipt arrived before its message was recorded; the consumer retries it later. */
@@ -45,8 +54,46 @@ const RECEIPT_STATUS: Partial<Record<ProviderEvent['type'], MessageStatus>> = {
   'message.failed': 'failed',
 };
 
-/** Nothing to run after commit: messaging has no realtime fan-out yet (the Inbox polls). */
+/** Nothing to run after commit. */
 const PROCESSED: HandlerResult = { status: 'processed', after: async () => undefined };
+
+/** What an applied event changed, for the after-commit step: messages to publish, files to fetch. */
+interface Changes {
+  messageIds: Set<string>;
+  conversationIds: Set<string>;
+  downloads: { attachment: MessageAttachment; businessNumber: string }[];
+}
+
+/**
+ * After commit: download new inbound files into storage, then publish every changed message and
+ * conversation to the organization's realtime sockets. Best effort; failures are logged.
+ */
+function afterCommit(
+  db: Database,
+  env: Env,
+  orgId: string,
+  changes: Changes,
+  fetchImpl?: typeof fetch,
+): () => Promise<void> {
+  return async () => {
+    if (changes.downloads.length > 0) {
+      const client = await withTenant(db, orgId, (tx) => telnyxMessagingClient(tx, env, fetchImpl));
+      for (const { attachment, businessNumber } of changes.downloads) {
+        const outcome = await downloadInbound(env, attachment, businessNumber, client);
+        if (outcome.status !== 'pending') {
+          await withTenant(db, orgId, (tx) => recordDownload(tx, attachment, outcome));
+        }
+      }
+    }
+    for (const id of changes.messageIds) {
+      const json = await withTenant(db, orgId, (tx) => loadMessageJson(tx, env, id));
+      if (json) await publishMessage(env, orgId, json);
+    }
+    for (const conversationId of changes.conversationIds) {
+      await publish(env, orgId, { type: 'conversation.updated', data: { conversationId } });
+    }
+  };
+}
 
 /**
  * The `message` handler of the event registry: normalizes one inbound message or receipt into
@@ -78,10 +125,14 @@ export const handleMessageEvent: EventHandler<'message'> = async (ctx, normalize
       .returning({ id: providerEventRaw.id });
     if (claimed.length === 0) return PROCESSED;
 
-    const ctxIn: EventContext = { tx, orgId: route.orgId, rawEventId, event, payload };
+    const changes: Changes = { messageIds: new Set(), conversationIds: new Set(), downloads: [] };
+    const ctxIn: EventContext = { tx, orgId: route.orgId, rawEventId, event, payload, changes };
     if (received) await ingestInbound(ctxIn);
     else await ingestReceipt(ctxIn);
-    return PROCESSED;
+    return {
+      status: 'processed',
+      after: afterCommit(db, ctx.env, route.orgId, changes, ctx.fetch),
+    } satisfies HandlerResult;
   });
 };
 
@@ -91,6 +142,61 @@ interface EventContext {
   rawEventId: string;
   event: ProviderEvent;
   payload: MessageEventPayload;
+  changes: Changes;
+}
+
+/**
+ * A message of the conversation by the id a provider gave for it: the channel's own id (wamid), or
+ * the provider's message id (Telnyx may rewrite references to its own ids).
+ */
+async function messageByReference(tx: Tx, conversationId: string, ref: string) {
+  const [row] = await tx
+    .select({ id: message.id })
+    .from(message)
+    .where(
+      and(
+        eq(message.conversationId, conversationId),
+        or(eq(message.channelMessageId, ref), eq(message.providerMessageId, ref)),
+      ),
+    )
+    .limit(1);
+  return row;
+}
+
+/** The contact's reaction lands on its target message; an unknown target is ignored. */
+async function applyInboundReaction(
+  ctx: EventContext,
+  conversationId: string,
+  reaction: NonNullable<MessageEventPayload['reaction']>,
+): Promise<void> {
+  const { tx, orgId, rawEventId } = ctx;
+  const target = await messageByReference(tx, conversationId, reaction.targetId);
+  if (!target) {
+    logger.warn('messaging.reaction_target_unknown', { rawEventId, orgId });
+    return;
+  }
+  if (reaction.emoji === null) {
+    await tx
+      .delete(messageReaction)
+      .where(
+        and(eq(messageReaction.messageId, target.id), eq(messageReaction.direction, 'inbound')),
+      );
+  } else {
+    await tx
+      .insert(messageReaction)
+      .values({
+        organizationId: orgId,
+        messageId: target.id,
+        direction: 'inbound',
+        emoji: reaction.emoji,
+        status: 'sent',
+      })
+      .onConflictDoUpdate({
+        target: [messageReaction.messageId, messageReaction.direction],
+        set: { emoji: reaction.emoji, status: 'sent' },
+      });
+  }
+  ctx.changes.messageIds.add(target.id);
 }
 
 async function ingestInbound(ctx: EventContext): Promise<void> {
@@ -103,6 +209,11 @@ async function ingestInbound(ctx: EventContext): Promise<void> {
   const found = await inboundContact(tx, orgId, phone.value, payload.channel);
   const contactRow = await lockLiveContact(tx, found.id);
   const conv = await ensureConversation(tx, orgId, contactRow.id, payload.channel);
+
+  if (payload.reaction) {
+    await applyInboundReaction(ctx, conv.id, payload.reaction);
+    return;
+  }
 
   const [existing] = await tx
     .select({ id: message.id })
@@ -117,7 +228,10 @@ async function ingestInbound(ctx: EventContext): Promise<void> {
   if (existing) return;
 
   const body = payload.body ?? '';
-  await insertMessage(tx, {
+  const replyTo = payload.replyToId
+    ? await messageByReference(tx, conv.id, payload.replyToId)
+    : undefined;
+  const inserted = await insertMessage(tx, {
     orgId,
     conversation: conv,
     direction: 'inbound',
@@ -126,9 +240,35 @@ async function ingestInbound(ctx: EventContext): Promise<void> {
     provider: event.provider,
     providerMessageId: event.resourceId,
     occurredAt: new Date(event.occurredAt),
+    channelMessageId: payload.channelMessageId ?? null,
+    replyToMessageId: replyTo?.id ?? null,
+    attachmentKind: payload.media?.kind ?? null,
   });
+  ctx.changes.messageIds.add(inserted.id);
+  ctx.changes.conversationIds.add(conv.id);
 
-  const keyword = classifyKeyword(body);
+  if (payload.media) {
+    const [attachment] = await tx
+      .insert(messageAttachment)
+      .values({
+        organizationId: orgId,
+        conversationId: conv.id,
+        messageId: inserted.id,
+        direction: 'inbound',
+        kind: payload.media.kind,
+        mimeType: payload.media.mimeType,
+        fileName: payload.media.fileName ?? null,
+        status: 'pending',
+        providerMediaId: payload.media.mediaId ?? null,
+        sourceUrl: payload.media.url ?? null,
+        sha256: payload.media.sha256 ?? null,
+      })
+      .returning();
+    if (attachment) ctx.changes.downloads.push({ attachment, businessNumber: payload.to });
+  }
+
+  // Keywords count only in text the contact typed, never in a file's caption.
+  const keyword = payload.media ? null : classifyKeyword(body);
   if (keyword) await applyKeyword(tx, orgId, conv.contactId, payload.channel, keyword, body);
 }
 
@@ -278,4 +418,17 @@ async function ingestReceipt(ctx: EventContext): Promise<void> {
     ...(payload.final === true ? { final: true } : {}),
   });
   if (result === 'unknown_message') throw new MessageNotYetKnownError(rawEventId);
+  if (result === 'applied') {
+    const [row] = await tx
+      .select({ id: message.id })
+      .from(message)
+      .where(
+        and(
+          eq(message.provider, event.provider as MessageProvider),
+          eq(message.providerMessageId, event.resourceId),
+        ),
+      )
+      .limit(1);
+    if (row) ctx.changes.messageIds.add(row.id);
+  }
 }

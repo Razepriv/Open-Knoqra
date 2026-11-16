@@ -55,18 +55,22 @@ function SyncError({ error }: { error: unknown }) {
   if (error instanceof ApiError && error.code === 'voice_not_configured') {
     return (
       <p role="alert" className="text-[14px] text-[color:var(--danger-text)] leading-snug">
-        Connect Telnyx before syncing numbers.{' '}
+        Connect your phone provider before syncing numbers.{' '}
         <Link
           to="/setup"
           search={{ step: 'connect' }}
           className="text-[color:var(--text)] underline underline-offset-4"
         >
-          Connect Telnyx
+          Connect your phone provider
         </Link>
       </p>
     );
   }
-  return <FormAlert message={errorMessage(error, 'Could not sync your numbers from Telnyx.')} />;
+  return (
+    <FormAlert
+      message={errorMessage(error, 'Could not sync your numbers from your phone provider.')}
+    />
+  );
 }
 
 function AssignedUseCell({
@@ -111,7 +115,7 @@ function EmptyNumbers({ canManage, connected }: { canManage: boolean; connected:
           search={{ step: 'connect' }}
           className={`font-medium text-[14px] underline underline-offset-4 ${focusRing}`}
         >
-          Connect Telnyx
+          Connect your phone provider
         </Link>
       ) : null}
     </div>

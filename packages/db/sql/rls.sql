@@ -83,3 +83,17 @@ GRANT UPDATE (status, provider_order_id, failure_code, updated_at) ON number_ord
 -- Self-host licensing: instance_license is a one-row system table with no RLS (the blanket grant
 -- above covers it); the key may be replaced but never deleted.
 REVOKE DELETE ON instance_license FROM knoqra_app;
+
+-- Messaging upgrade: attachments, reactions and US texting registrations are tenant tables with the
+-- same ENABLE + FORCE + tenant_isolation policy. Attachments and registrations are never deleted by
+-- the app (a draft attachment simply stays unsent); a removed reaction deletes its row.
+DO $$ DECLARE t text; BEGIN
+  FOREACH t IN ARRAY ARRAY['message_attachment','message_reaction','sms_registration'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', t);
+    EXECUTE format($p$CREATE POLICY tenant_isolation ON %I
+      USING (organization_id = NULLIF(current_setting('app.org_id', true), ''))
+      WITH CHECK (organization_id = NULLIF(current_setting('app.org_id', true), ''))$p$, t);
+  END LOOP; END $$;
+REVOKE DELETE ON message_attachment, sms_registration FROM knoqra_app;

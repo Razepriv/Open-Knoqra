@@ -1,5 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import {
+  ATTACHMENT_KINDS,
+  ATTACHMENT_STATUSES,
   type ComposerState,
   MESSAGE_STATUSES,
   MESSAGING_CHANNELS,
@@ -62,6 +64,44 @@ export const ConversationDetailSchema = ConversationSchema.extend({
   sender: SenderJsonSchema.nullable(),
 }).openapi('ConversationDetail');
 
+export const AttachmentSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(ATTACHMENT_KINDS),
+    mimeType: z.string(),
+    sizeBytes: z.number().int().nullable(),
+    fileName: z.string().nullable(),
+    status: z.enum(ATTACHMENT_STATUSES),
+    durationMs: z.number().int().nullable(),
+    /** Up to 48 bars from 0 to 100, for a voice note's waveform. */
+    waveform: z.array(z.number().int()).nullable(),
+    /** A signed link to the file, valid until `urlExpiresAt`; null when it cannot be fetched. */
+    url: z.string().nullable(),
+    urlExpiresAt: z.iso.datetime().nullable(),
+  })
+  .openapi('MessageAttachment');
+export type AttachmentJson = z.infer<typeof AttachmentSchema>;
+
+export const ReactionSchema = z
+  .object({
+    emoji: z.string(),
+    /** `inbound` is the contact's reaction, `outbound` the workspace's. */
+    direction: z.enum(['inbound', 'outbound']),
+    status: z.enum(['pending', 'sent', 'failed']),
+  })
+  .openapi('MessageReaction');
+export type ReactionJson = z.infer<typeof ReactionSchema>;
+
+export const ReplyPreviewSchema = z
+  .object({
+    id: z.string(),
+    direction: z.enum(['inbound', 'outbound']),
+    body: z.string(),
+    attachmentKind: z.enum(ATTACHMENT_KINDS).nullable(),
+  })
+  .openapi('MessageReplyPreview');
+export type ReplyPreviewJson = z.infer<typeof ReplyPreviewSchema>;
+
 export const MessageSchema = z
   .object({
     id: z.string(),
@@ -75,11 +115,27 @@ export const MessageSchema = z
     error: z.object({ code: z.string(), message: z.string() }).nullable(),
     authorUserId: z.string().nullable(),
     providerMessageId: z.string().nullable(),
+    /** The id the sender chose for an outbound send, so the Desk can match its optimistic copy. */
+    clientMessageId: z.string().nullable(),
     occurredAt: z.iso.datetime(),
     statusUpdatedAt: z.iso.datetime(),
+    attachments: z.array(AttachmentSchema),
+    reactions: z.array(ReactionSchema),
+    replyTo: ReplyPreviewSchema.nullable(),
+    /** Whether replies and reactions can target this message (inbound WhatsApp with its id). */
+    replyable: z.boolean(),
   })
   .openapi('Message');
 export type MessageJson = z.infer<typeof MessageSchema>;
+
+/** What a message JSON adds to its row: files, reactions and the quoted message. */
+export interface MessageExtras {
+  attachments: AttachmentJson[];
+  reactions: ReactionJson[];
+  replyTo: ReplyPreviewJson | null;
+}
+
+export const NO_EXTRAS: MessageExtras = { attachments: [], reactions: [], replyTo: null };
 
 export const MessageStatusEntrySchema = z
   .object({
@@ -95,8 +151,20 @@ export const MessageDetailSchema = MessageSchema.extend({
 }).openapi('MessageDetail');
 export type MessageDetailJson = z.infer<typeof MessageDetailSchema>;
 
+/** Inbound WhatsApp messages with a channel id can be replied to and reacted to. */
+export const isReplyable = (row: {
+  channel: string;
+  direction: string;
+  channelMessageId: string | null;
+}): boolean =>
+  row.channel === 'whatsapp' && row.direction === 'inbound' && row.channelMessageId !== null;
+
 /** A message row (plus its template's name, if any) as the API's `Message`. */
-export const messageJson = (row: MessageRow, templateName: string | null): MessageJson => ({
+export const messageJson = (
+  row: MessageRow,
+  templateName: string | null,
+  extras: MessageExtras = NO_EXTRAS,
+): MessageJson => ({
   id: row.id,
   conversationId: row.conversationId,
   channel: row.channel,
@@ -108,8 +176,11 @@ export const messageJson = (row: MessageRow, templateName: string | null): Messa
   error: row.errorCode ? { code: row.errorCode, message: row.errorMessage ?? '' } : null,
   authorUserId: row.authorUserId,
   providerMessageId: row.providerMessageId,
+  clientMessageId: row.clientMessageId,
   occurredAt: row.occurredAt.toISOString(),
   statusUpdatedAt: row.statusUpdatedAt.toISOString(),
+  ...extras,
+  replyable: isReplyable(row),
 });
 
 export const ThreadNoteSchema = z

@@ -4,11 +4,18 @@ import { logger } from './logger';
 /** Header the Worker route sets, after authenticating, to tag a socket with its user. */
 export const REALTIME_USER_HEADER = 'x-knoqra-user';
 
-/** Server-to-client realtime frames, sent as JSON. M3 adds `message.*` types. */
+/**
+ * Server-to-client realtime frames, sent as JSON. `message.updated` carries a whole `Message` (new
+ * or changed: status, attachment stored, reaction); `conversation.updated` names a conversation
+ * whose summary changed; `channels.updated` says a channel's status changed (Enable flows, sync).
+ */
 export type RealtimeMessage =
   | { type: 'call.updated'; data: unknown }
   | { type: 'wallet.updated'; data: unknown }
-  | { type: 'voicemail.created'; data: unknown };
+  | { type: 'voicemail.created'; data: unknown }
+  | { type: 'message.updated'; data: { conversationId: string; message: unknown } }
+  | { type: 'conversation.updated'; data: { conversationId: string } }
+  | { type: 'channels.updated'; data: Record<string, never> };
 
 /**
  * Sends `message` to every socket connected for the organization. Best effort: realtime is a

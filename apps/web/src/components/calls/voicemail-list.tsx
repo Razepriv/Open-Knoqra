@@ -88,7 +88,7 @@ function VoicemailRow({ voicemail, now }: { voicemail: Voicemail; now: Date }) {
       </div>
       <p className="flex items-center gap-2 text-[12.5px] text-[color:var(--muted)] leading-snug">
         <VoicemailIcon size={14} strokeWidth={1.75} aria-hidden="true" />
-        Audio playback arrives with live Telnyx.
+        Audio playback arrives once your phone provider is connected.
       </p>
       <div className="flex flex-col gap-[6px] rounded-[14px] bg-[color:var(--cell)] p-3">
         <span className="font-[family-name:var(--font-mono)] font-medium text-[10.5px] text-[color:var(--muted)] uppercase leading-none tracking-[.04em]">

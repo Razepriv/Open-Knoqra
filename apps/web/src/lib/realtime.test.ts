@@ -253,6 +253,57 @@ describe('startRealtime messages', () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: ['voicemails'] });
   });
 
+  it('writes message.updated into the open thread at once, and refetches the inbox on conversation.updated', () => {
+    const { queryClient } = setup();
+    queryClient.setQueryData(['thread', 'cv_1'], {
+      pages: [{ items: [], nextCursor: null }],
+      pageParams: [undefined],
+    });
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    last().open();
+    const message = {
+      id: 'mg_1',
+      conversationId: 'cv_1',
+      status: 'delivered',
+      occurredAt: '2026-11-16T10:00:00.000Z',
+      attachments: [],
+      reactions: [],
+      clientMessageId: null,
+    };
+    last().message({ type: 'message.updated', data: { conversationId: 'cv_1', message } });
+    expect(
+      queryClient.getQueryData<{ pages: Array<{ items: unknown[] }> }>(['thread', 'cv_1'])?.pages[0]
+        ?.items,
+    ).toEqual([{ kind: 'message', message }]);
+    last().message({ type: 'conversation.updated', data: { conversationId: 'cv_1' } });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['conversations'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['conversation', 'cv_1'] });
+    last().message({ type: 'channels.updated', data: {} });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['messaging-channels'] });
+  });
+
+  it('refetches the thread for a message frame it cannot read', () => {
+    const { queryClient } = setup();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    last().open();
+    last().message({
+      type: 'message.updated',
+      data: { conversationId: 'cv_1', message: { id: 'mg_1' } },
+    });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['thread', 'cv_1'] });
+  });
+
+  it('refetches the inbox after a reconnect', () => {
+    const { queryClient } = setup();
+    last().open();
+    const spy = vi.spyOn(queryClient, 'invalidateQueries');
+    last().drop();
+    vi.advanceTimersByTime(1000);
+    last().open();
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['thread'] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['conversations'] });
+  });
+
   it('ignores pong, malformed and unknown frames', () => {
     const { queryClient } = setup();
     last().open();

@@ -492,8 +492,11 @@ export async function syncNumbersAndOrders(
   env: Env,
   orgId: string,
   actor: Tenant | null,
+  opts: { fetch?: typeof fetch } = {},
 ): Promise<number> {
-  const access = await withTenant(db, orgId, (tx) => openProviderAccess(tx, env, orgId));
+  const access = await withTenant(db, orgId, (tx) =>
+    openProviderAccess(tx, env, orgId, opts.fetch ? { fetch: opts.fetch } : {}),
+  );
   if (access.kind === 'none') return 0;
   const listed = await access.numbers.listNumbers();
   const prefetched: NumbersProvider = { listNumbers: async () => listed };

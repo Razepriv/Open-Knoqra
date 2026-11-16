@@ -65,7 +65,7 @@ function Breakdown({ quote }: { quote: NumberQuote }) {
         </div>
       </dl>
       <p className="text-[13px] text-[color:var(--muted)] leading-snug">
-        Charged to your KNOQRA wallet now. Telnyx bills you the same amount.
+        Charged to your KNOQRA wallet now. Your phone provider bills you the same amount.
       </p>
       <p className="text-[12px] text-[color:var(--muted)]">
         {`This price is held until ${expiryTime(quote)}.`}

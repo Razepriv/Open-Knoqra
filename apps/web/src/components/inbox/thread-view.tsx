@@ -1,7 +1,7 @@
 import { Avatar, Button, Panel } from '@knoqra/ui';
 import { Link } from '@tanstack/react-router';
 import { MessageCircle, MessageSquare } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { type DragEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/api';
 import { gradientFor } from '../../lib/contacts';
 import { type ConversationDetail, useConversation, useMarkRead } from '../../lib/inbox';
@@ -10,6 +10,7 @@ import { focusRing } from '../../lib/ui-classes';
 import { useNow } from '../../lib/use-now';
 import { PageRibbon } from '../shell/ribbon';
 import { Composer } from './composer';
+import { ComposerBridge, useComposerBridge } from './composer-bridge';
 import { InboxRibbon } from './inbox-ribbon';
 import { RibbonSkeleton, ThreadViewSkeleton } from './inbox-skeletons';
 import { ThreadMessages } from './thread-messages';
@@ -61,16 +62,54 @@ export function ThreadView({ conversationId, onManageTemplates }: ThreadViewProp
 
   const data = conversation.data;
   return (
+    <ComposerBridge key={conversationId}>
+      <DropZone enabled={data.channel === 'whatsapp'}>
+        <ThreadHeader conversation={data} />
+        <ThreadMessages conversationId={conversationId} now={now} />
+        <Composer conversation={data} onManageTemplates={onManageTemplates} />
+        <PageRibbon label="Contact">
+          <InboxRibbon conversation={data} now={now} />
+        </PageRibbon>
+      </DropZone>
+    </ComposerBridge>
+  );
+}
+
+/** The conversation panel; on WhatsApp, a file dropped on it goes to the composer. */
+function DropZone({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+  const bridge = useComposerBridge();
+  const [over, setOver] = useState(false);
+  const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer.types).includes('Files');
+  return (
     <Panel
       aria-label="Conversation"
-      className="flex min-h-[560px] min-w-0 flex-col overflow-hidden lg:max-h-[calc(100dvh_-_2_*_var(--page-pad,0px)_-_6rem)]"
+      className="relative flex min-h-[560px] min-w-0 flex-col overflow-hidden lg:max-h-[calc(100dvh_-_2_*_var(--page-pad,0px)_-_6rem)]"
+      onDragOver={(event) => {
+        if (!enabled || !hasFiles(event)) return;
+        event.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setOver(false);
+      }}
+      onDrop={(event) => {
+        if (!enabled) return;
+        event.preventDefault();
+        setOver(false);
+        const file = event.dataTransfer.files[0];
+        if (file) bridge.setDropped(file);
+      }}
     >
-      <ThreadHeader conversation={data} />
-      <ThreadMessages conversationId={conversationId} now={now} />
-      <Composer conversation={data} onManageTemplates={onManageTemplates} />
-      <PageRibbon label="Contact">
-        <InboxRibbon conversation={data} now={now} />
-      </PageRibbon>
+      {children}
+      {over ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-[22px] border-2 border-[color:var(--line)] border-dashed bg-[color:var(--page)] font-medium text-[15px] opacity-90"
+        >
+          Drop to attach
+        </div>
+      ) : null}
     </Panel>
   );
 }

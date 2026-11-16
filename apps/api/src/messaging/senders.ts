@@ -2,24 +2,21 @@ import type { MessagingChannel, RegistrationStatus } from '@knoqra/core';
 import {
   type ChannelConnection,
   channelConnection,
+  channelRoute,
   type PhoneNumberRow,
   type ProviderCredentialRow,
   phoneNumber,
   providerCredential,
+  smsRegistration,
   type Tx,
 } from '@knoqra/db';
 import { FakeProvider, type MessagingProvider, TelnyxMessagingProvider } from '@knoqra/providers';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Env } from '../env';
 import { logger } from '../lib/logger';
 import { isValidMasterKey, openSecret, telnyxKeyAad } from '../lib/secret-envelope';
 import { adapterFor } from '../routes/webhooks';
-import {
-  isActiveSynced,
-  registrationIsSynced,
-  sendableFor,
-  smsRegistration,
-} from '../services/sender-registration';
+import { registrationFor, sendableFor } from '../services/sender-registration';
 
 export interface Sender {
   id: string;
@@ -44,20 +41,20 @@ export async function hasTelnyxCredential(tx: Tx): Promise<boolean> {
 }
 
 /**
- * Whether sends through this provider and channel are switched on. Telnyx is live only when it is
- * the selected provider, the organization saved a Telnyx credential, and the channel's approval
- * flag is exactly `"true"`. The connection's registration status is the composer's to check.
+ * Whether sends through this provider are switched on. Telnyx is live when it is the deployment's
+ * provider and the organization saved a Telnyx credential. Whether this workspace may send on a
+ * channel is its own registration status (US texting registration, Meta's approval), read from
+ * the provider by the number sync and checked by the composer: the deployment-wide
+ * SMS_10DLC_APPROVED and WHATSAPP_META_APPROVED flags are retired.
  */
 export function liveEnabled(
   provider: 'fake' | 'telnyx',
-  channel: MessagingChannel,
+  _channel: MessagingChannel,
   env: Env,
   hasCredential: boolean,
 ): boolean {
   if (provider === 'fake') return adapterFor('fake', env) !== null;
-  if (env.PROVIDER !== 'telnyx' || !hasCredential) return false;
-  const flag = channel === 'sms' ? env.SMS_10DLC_APPROVED : env.WHATSAPP_META_APPROVED;
-  return flag === 'true';
+  return env.PROVIDER === 'telnyx' && hasCredential;
 }
 
 export function toSender(row: ChannelConnection, env: Env, hasCredential: boolean): Sender {
@@ -122,6 +119,45 @@ export function openTelnyxKey(
     },
     { masterKeyBase64, aad: telnyxKeyAad(credential.organizationId) },
   );
+}
+
+/**
+ * The organization's Telnyx API key, decrypted for one use (never cached, never logged), or null
+ * without a credential or a readable key.
+ */
+export async function telnyxApiKey(tx: Tx, env: Env): Promise<string | null> {
+  const masterKeyBase64 = env.CREDENTIALS_MASTER_KEY;
+  if (!isValidMasterKey(masterKeyBase64)) return null;
+  const [credential] = await tx
+    .select()
+    .from(providerCredential)
+    .where(eq(providerCredential.provider, 'telnyx'))
+    .limit(1);
+  if (!credential) return null;
+  try {
+    return await openTelnyxKey(credential, masterKeyBase64);
+  } catch (error) {
+    logger.warn('messaging.credential_unreadable', {
+      orgId: credential.organizationId,
+      errorName: error instanceof Error ? error.name : 'unknown',
+    });
+    return null;
+  }
+}
+
+/**
+ * The organization's Telnyx messaging client, whatever its senders' states: for reads that need the
+ * key (downloading inbound files). Null without a credential or a readable key.
+ */
+export async function telnyxMessagingClient(
+  tx: Tx,
+  env: Env,
+  fetchImpl?: typeof fetch,
+): Promise<TelnyxMessagingProvider | null> {
+  const apiKey = await telnyxApiKey(tx, env);
+  return apiKey
+    ? new TelnyxMessagingProvider({ apiKey, ...(fetchImpl ? { fetch: fetchImpl } : {}) })
+    : null;
 }
 
 /**
@@ -194,42 +230,31 @@ export async function syncedTelnyxNumber(
 }
 
 /**
- * Brings the telnyx senders in line with the synced numbers (rulings AQ and AR), in M4's sync
- * transaction after the numbers are written. A sender whose number is no longer an active synced
- * Telnyx number is deleted with its routes: the workspace no longer controls it. An SMS sender is
- * also deleted when its number lost SMS, and otherwise takes the status its 10DLC state gives. A
- * WhatsApp sender keeps the status its owner set: M4's sync does not read WhatsApp yet.
+ * Brings the telnyx senders in line with the synced numbers, in the sync transaction after the
+ * numbers are written. A sender whose number is no longer an active synced Telnyx number that can
+ * send on its channel is deleted with its routes: the workspace no longer controls it. Every other
+ * sender takes the registration status its number gives (10DLC for SMS, Meta's approval for
+ * WhatsApp). When the sync could not read WhatsApp (`whatsappSynced` false) WhatsApp senders are
+ * left as they are. A channel with no sender at all gets one when a number qualifies: the
+ * account's WhatsApp number (approved first, then the caller id), and for SMS the number the SMS
+ * Enable flow registered.
  */
-export async function refreshTelnyxSenders(tx: Tx): Promise<void> {
-  const senders = await tx
-    .select()
-    .from(channelConnection)
-    .where(eq(channelConnection.provider, 'telnyx'))
-    .for('update');
-  if (senders.length === 0) return;
-  const numbers = await tx
-    .select()
-    .from(phoneNumber)
-    .where(
-      and(
-        eq(phoneNumber.provider, 'telnyx'),
-        inArray(
-          phoneNumber.e164,
-          senders.map((s) => s.address),
-        ),
-      ),
-    );
+export async function refreshTelnyxSenders(
+  tx: Tx,
+  opts: { orgId?: string; whatsappSynced?: boolean } = {},
+): Promise<void> {
+  const whatsappSynced = opts.whatsappSynced !== false;
+  const senders = await tx.select().from(channelConnection).for('update');
+  const numbers = await tx.select().from(phoneNumber).where(eq(phoneNumber.provider, 'telnyx'));
   const byE164 = new Map(numbers.map((n) => [n.e164, n]));
-  for (const sender of senders) {
+  for (const sender of senders.filter((s) => s.provider === 'telnyx')) {
+    if (sender.channel === 'whatsapp' && !whatsappSynced) continue;
     const row = byE164.get(sender.address);
-    const synced = registrationIsSynced(sender.channel);
-    const keep = synced ? sendableFor(row, sender.channel) === 'ok' : isActiveSynced(row);
-    if (!row || !keep) {
+    if (!row || sendableFor(row, sender.channel) !== 'ok') {
       await tx.delete(channelConnection).where(eq(channelConnection.id, sender.id));
       continue;
     }
-    if (!synced) continue;
-    const registrationStatus = smsRegistration(row);
+    const registrationStatus = registrationFor(row, sender.channel);
     if (registrationStatus !== sender.registrationStatus) {
       await tx
         .update(channelConnection)
@@ -237,4 +262,86 @@ export async function refreshTelnyxSenders(tx: Tx): Promise<void> {
         .where(eq(channelConnection.id, sender.id));
     }
   }
+  const orgId = opts.orgId ?? numbers[0]?.organizationId;
+  if (!orgId) return;
+  const taken = new Set(senders.map((s) => s.channel));
+  if (!taken.has('whatsapp') && whatsappSynced) {
+    const candidate = await whatsappCandidate(tx, numbers);
+    if (candidate) await adoptSender(tx, orgId, 'whatsapp', candidate);
+  }
+  if (!taken.has('sms')) {
+    const [registration] = await tx
+      .select({ phone: smsRegistration.phoneE164 })
+      .from(smsRegistration)
+      .limit(1);
+    const row = registration ? byE164.get(registration.phone) : undefined;
+    if (row && sendableFor(row, 'sms') === 'ok') await adoptSender(tx, orgId, 'sms', row);
+  }
+}
+
+/** The number to make the WhatsApp sender: approved before pending, the caller id first. */
+async function whatsappCandidate(
+  tx: Tx,
+  numbers: PhoneNumberRow[],
+): Promise<PhoneNumberRow | undefined> {
+  const usable = numbers.filter(
+    (n) => sendableFor(n, 'whatsapp') === 'ok' && n.whatsappStatus !== 'rejected',
+  );
+  if (usable.length === 0) return undefined;
+  const [credential] = await tx
+    .select({ callerId: providerCredential.callerIdE164 })
+    .from(providerCredential)
+    .where(eq(providerCredential.provider, 'telnyx'))
+    .limit(1);
+  const rank = (n: PhoneNumberRow) =>
+    (n.whatsappStatus === 'approved' ? 0 : 2) + (n.e164 === credential?.callerId ? 0 : 1);
+  return [...usable].sort((a, b) => rank(a) - rank(b) || a.e164.localeCompare(b.e164))[0];
+}
+
+/**
+ * Makes a synced number the channel's sender with its route. A number already routed to another
+ * workspace is left alone (routes are readable across workspaces, ruling AJ).
+ */
+async function adoptSender(
+  tx: Tx,
+  orgId: string,
+  channel: MessagingChannel,
+  row: PhoneNumberRow,
+): Promise<void> {
+  const [routed] = await tx
+    .select({ orgId: channelRoute.organizationId })
+    .from(channelRoute)
+    .where(
+      and(
+        eq(channelRoute.provider, 'telnyx'),
+        eq(channelRoute.channel, channel),
+        eq(channelRoute.address, row.e164),
+      ),
+    )
+    .limit(1);
+  if (routed && routed.orgId !== orgId) return;
+  const [created] = await tx
+    .insert(channelConnection)
+    .values({
+      organizationId: orgId,
+      channel,
+      provider: 'telnyx',
+      address: row.e164,
+      registrationStatus: registrationFor(row, channel),
+    })
+    .onConflictDoNothing()
+    .returning({ id: channelConnection.id });
+  if (!created) return;
+  await tx
+    .insert(channelRoute)
+    .values({
+      organizationId: orgId,
+      provider: 'telnyx',
+      channel,
+      address: row.e164,
+      connectionId: created.id,
+    })
+    .onConflictDoNothing({
+      target: [channelRoute.provider, channelRoute.channel, channelRoute.address],
+    });
 }

@@ -133,10 +133,15 @@ const NUMBERS_1 = `${BASE}/phone_numbers?page%5Bnumber%5D=1&page%5Bsize%5D=250`;
 const NUMBERS_2 = `${BASE}/phone_numbers?page%5Bnumber%5D=2&page%5Bsize%5D=250`;
 const CAMPAIGNS = `${BASE}/10dlc/phone_number_campaigns?page%5Bsize%5D=250`;
 
+const WA_NUMBERS = `${BASE}/whatsapp/phone_numbers?page%5Bnumber%5D=1&page%5Bsize%5D=250`;
+const WA_ACCOUNTS = `${BASE}/whatsapp/business_accounts?page%5Bnumber%5D=1&page%5Bsize%5D=250`;
+const NO_WHATSAPP = { data: [], meta: { page_number: 1, total_pages: 0 } };
+
 const numberRoutes = (): Route[] => [
   { method: 'GET', url: NUMBERS_1, respond: fixtureResponse('phone-numbers-page-1') },
   { method: 'GET', url: NUMBERS_2, respond: fixtureResponse('phone-numbers-page-2') },
   { method: 'GET', url: CAMPAIGNS, respond: fixtureResponse('phone-number-campaigns') },
+  { method: 'GET', url: WA_NUMBERS, respond: json(200, NO_WHATSAPP) },
 ];
 
 describe('TelnyxProvider.fetchBalance', () => {
@@ -188,7 +193,7 @@ describe('TelnyxProvider.listNumbers', () => {
   it('concatenates pages and maps capabilities, status and 10DLC state', async () => {
     const { calls, fetchImpl } = stubFetch(numberRoutes());
     const numbers = await provider(fetchImpl).listNumbers();
-    expect(calls.map((c) => c.url)).toEqual([NUMBERS_1, NUMBERS_2, CAMPAIGNS]);
+    expect(calls.map((c) => c.url)).toEqual([NUMBERS_1, NUMBERS_2, CAMPAIGNS, WA_NUMBERS]);
     expect(calls.every((c) => c.headers.get('authorization') === `Bearer ${API_KEY}`)).toBe(true);
     expect(numbers).toEqual([
       {
@@ -258,6 +263,65 @@ describe('TelnyxProvider.listNumbers', () => {
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(TelnyxApiError);
     expect((error as Error).message).not.toContain(API_KEY);
+  });
+});
+
+describe('TelnyxProvider.listNumbers WhatsApp facts', () => {
+  const routesWith = (wa: Route[]): Route[] => [...numberRoutes().slice(0, 3), ...wa];
+
+  it('marks a CONNECTED number on an APPROVED account as an approved WhatsApp number', async () => {
+    const { fetchImpl } = stubFetch(
+      routesWith([
+        { method: 'GET', url: WA_NUMBERS, respond: fixtureResponse('whatsapp-phone-numbers') },
+        { method: 'GET', url: WA_ACCOUNTS, respond: fixtureResponse('whatsapp-business-accounts') },
+      ]),
+    );
+    const numbers = await provider(fetchImpl).listNumbers();
+    expect(numbers[0]).toMatchObject({
+      e164: '+12025550100',
+      capabilities: { whatsapp: true },
+      whatsapp: 'approved',
+      whatsappDetail: { displayName: 'Example Repairs', qualityRating: 'GREEN' },
+    });
+    expect(numbers[1]).toMatchObject({
+      e164: '+12025550101',
+      capabilities: { whatsapp: true },
+      whatsapp: 'pending',
+    });
+    expect(numbers[2]).toMatchObject({ capabilities: { whatsapp: false }, whatsapp: 'none' });
+    expect(numbers.every((n) => n.whatsappSynced === undefined)).toBe(true);
+  });
+
+  it('reads a 404 (no WhatsApp product) as no WhatsApp numbers', async () => {
+    const { fetchImpl } = stubFetch(
+      routesWith([
+        { method: 'GET', url: WA_NUMBERS, respond: json(404, { errors: [{ code: '10005' }] }) },
+      ]),
+    );
+    const numbers = await provider(fetchImpl).listNumbers();
+    expect(numbers.every((n) => n.whatsapp === 'none' && n.whatsappSynced === undefined)).toBe(
+      true,
+    );
+  });
+
+  it('keeps what it knew when a restricted key may not read WhatsApp (403)', async () => {
+    const { fetchImpl } = stubFetch(
+      routesWith([
+        { method: 'GET', url: WA_NUMBERS, respond: json(403, { errors: [{ code: '10010' }] }) },
+      ]),
+    );
+    const numbers = await provider(fetchImpl).listNumbers();
+    expect(numbers.every((n) => n.whatsappSynced === false)).toBe(true);
+  });
+
+  it('marks the WhatsApp facts unread on an outage, so the sync keeps what it knew', async () => {
+    const { fetchImpl } = stubFetch(
+      routesWith([
+        { method: 'GET', url: WA_NUMBERS, respond: json(503, { errors: [{ code: 'x' }] }) },
+      ]),
+    );
+    const numbers = await provider(fetchImpl).listNumbers();
+    expect(numbers.every((n) => n.whatsappSynced === false)).toBe(true);
   });
 });
 

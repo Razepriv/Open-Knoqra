@@ -1,8 +1,12 @@
-import { createDb, type Database } from '@knoqra/db';
+import { createDb, type Database, withTenant } from '@knoqra/db';
 import { connectionString, type Env } from '../env';
 import { runStaleCallSweep } from '../events/stale-calls';
+import { publish } from '../lib/realtime';
+import { sweepOrgDispatch } from '../messaging/dispatch-sweep';
+import { hasTelnyxCredential } from '../messaging/senders';
+import { advanceSmsRegistration } from '../messaging/sms-registration';
 import { pollOrgBalance } from '../services/balance-poll';
-import { completeOrgPendingOrders } from '../services/number-purchase';
+import { completeOrgPendingOrders, syncNumbersAndOrders } from '../services/number-purchase';
 import { reconcileOrgDay } from '../services/reconcile';
 import { forEachOrganization } from './run';
 
@@ -101,8 +105,73 @@ export const staleCallSweepJob: CronJob = {
   run: (env) => runStaleCallSweep(env),
 };
 
+/** Sends messages no worker claimed and fails interrupted sends (messaging/dispatch-sweep.ts). */
+export async function runDispatchSweep(env: Env, opts?: { now?: Date }): Promise<void> {
+  const handle = createDb(connectionString(env));
+  try {
+    await forEachOrganization(handle.db, async (orgId) => {
+      await sweepOrgDispatch(handle.db, env, orgId, opts?.now);
+    });
+  } finally {
+    await handle.close();
+  }
+}
+
 /**
- * Scheduled jobs, one per cron expression. A stream that adds a job appends it here AND adds its
- * expression to `triggers.crons` in wrangler.jsonc (every env block).
+ * One organization's messaging status: re-syncs its numbers from its own provider account (10DLC
+ * and Meta's WhatsApp approval move the senders), advances an in-flight SMS registration, and
+ * tells the Desk. Only for organizations with a Telnyx connection on a Telnyx deployment.
  */
-export const CRON_JOBS: readonly CronJob[] = [staleCallSweepJob, balancePollJob, reconcileJob];
+export async function messagingStatusOrg(
+  db: Database,
+  env: Env,
+  orgId: string,
+  fetchImpl?: typeof fetch,
+): Promise<void> {
+  if (env.PROVIDER !== 'telnyx') return;
+  const connected = await withTenant(db, orgId, (tx) => hasTelnyxCredential(tx));
+  if (!connected) return;
+  const deps = fetchImpl ? { fetch: fetchImpl } : {};
+  await advanceSmsRegistration(db, env, orgId, deps);
+  await syncNumbersAndOrders(db, env, orgId, null, deps);
+  await publish(env, orgId, { type: 'channels.updated', data: {} });
+}
+
+export async function runMessagingStatus(env: Env): Promise<void> {
+  const handle = createDb(connectionString(env));
+  try {
+    await forEachOrganization(handle.db, async (orgId) => {
+      await messagingStatusOrg(handle.db, env, orgId);
+    });
+  } finally {
+    await handle.close();
+  }
+}
+
+/** Sends what the request's background send never sent; fails sends that never got an answer. */
+export const messageDispatchSweepJob: CronJob = {
+  name: 'message-dispatch-sweep',
+  cron: '*/5 * * * *',
+  maxIntervalMinutes: 5,
+  run: (env) => runDispatchSweep(env),
+};
+
+/** Reads each workspace's SMS and WhatsApp status from its provider and advances registrations. */
+export const messagingStatusJob: CronJob = {
+  name: 'messaging-status',
+  cron: '*/30 * * * *',
+  maxIntervalMinutes: 90,
+  run: (env) => runMessagingStatus(env),
+};
+
+/**
+ * Scheduled jobs. Several may share a cron expression: each runs (and is recorded) in turn. A
+ * stream that adds an expression adds it to `triggers.crons` in wrangler.jsonc (every env block).
+ */
+export const CRON_JOBS: readonly CronJob[] = [
+  staleCallSweepJob,
+  balancePollJob,
+  reconcileJob,
+  messageDispatchSweepJob,
+  messagingStatusJob,
+];

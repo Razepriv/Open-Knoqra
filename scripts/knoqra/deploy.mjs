@@ -18,7 +18,13 @@ import {
   secretStrings,
 } from './settings.mjs';
 import { createUi } from './ui.mjs';
-import { buildApiConfig, buildWebConfig, queueNames, renderConfig } from './wrangler-config.mjs';
+import {
+  bucketNames,
+  buildApiConfig,
+  buildWebConfig,
+  queueNames,
+  renderConfig,
+} from './wrangler-config.mjs';
 
 export const STEPS = ['db', 'cloudflare', 'config', 'api', 'secrets', 'web', 'status'];
 export const DRY_RUN_HYPERDRIVE_ID = '<created by deploy cloudflare>';
@@ -235,6 +241,17 @@ async function cloudflareStep(ctx) {
     else {
       await cf.createQueue(account, queue);
       ui.ok(`Queue ${queue} ${would}created`);
+    }
+  }
+  const buckets = bucketNames(readBase(ctx, 'api'));
+  if (buckets.length > 0) {
+    const haveBuckets = await read(ctx, () => cf.listBuckets(account), []);
+    for (const bucket of buckets) {
+      if (haveBuckets.includes(bucket)) ui.ok(`R2 bucket ${bucket} exists`);
+      else {
+        await cf.createBucket(account, bucket);
+        ui.ok(`R2 bucket ${bucket} ${would}created (message attachments)`);
+      }
     }
   }
 }

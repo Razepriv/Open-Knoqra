@@ -7,7 +7,7 @@ export function NoSenders({ sandboxAvailable }: { sandboxAvailable: boolean }) {
   if (!sandboxAvailable) {
     return (
       <p className="p-2 text-[15px] leading-relaxed">
-        Connect a number in Numbers to start messaging.
+        Enable SMS or WhatsApp above to start messaging.
       </p>
     );
   }

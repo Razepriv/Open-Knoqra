@@ -77,11 +77,144 @@ describe('normalizeTelnyxMessage', () => {
     expect(normalizeTelnyxMessage(body)?.payload.body).toBe('Hello');
   });
 
-  it('ignores a WhatsApp inbound message that is not text', () => {
+  it('keeps a WhatsApp image sent with only a media id, to download by id', () => {
     const body = withPayload('webhook-whatsapp-received', {
       body: { type: 'image', image: { id: 'fake-media-id' } },
     });
+    const event = normalizeTelnyxMessage(body);
+    expect(event?.payload).toEqual({
+      channel: 'whatsapp',
+      from: CONTACT,
+      to: OUR,
+      media: { kind: 'image', mimeType: 'image/jpeg', mediaId: 'fake-media-id' },
+    });
+    expectValidForM3(event);
+  });
+
+  it('ignores a WhatsApp media message with neither a URL nor an id', () => {
+    const body = withPayload('webhook-whatsapp-received', {
+      body: { type: 'image', image: { mime_type: 'image/jpeg' } },
+    });
     expect(normalizeTelnyxMessage(body)).toBeNull();
+  });
+
+  it('normalizes a WhatsApp image with a hosted URL, its caption and the wamid', () => {
+    const event = normalizeTelnyxMessage(fixture('webhook-whatsapp-image-received'));
+    expect(event).toMatchObject({
+      type: 'message.received',
+      providerMessageId: '00000000-0000-4000-8000-0000000c0001',
+      payload: {
+        channel: 'whatsapp',
+        from: CONTACT,
+        to: OUR,
+        body: 'The broken part',
+        media: {
+          kind: 'image',
+          mimeType: 'image/jpeg',
+          url: 'https://media.example.test/telnyx-hosted/00000000-0000-4000-8000-0000000c0001',
+          sha256: 'Zm9vYmFyc2hhMjU2',
+        },
+        channelMessageId: expect.stringMatching(/^wamid\./),
+      },
+    });
+    expectValidForM3(event);
+  });
+
+  it('normalizes a WhatsApp voice note sent by media id as a voice attachment', () => {
+    const event = normalizeTelnyxMessage(fixture('webhook-whatsapp-voice-received'));
+    expect(event?.payload.media).toEqual({
+      kind: 'voice',
+      mimeType: 'audio/ogg; codecs=opus',
+      mediaId: '1330663939258924',
+      sha256: 'dm9pY2VzaGEyNTY=',
+    });
+    expect(event?.payload.body).toBeUndefined();
+    expectValidForM3(event);
+  });
+
+  it('treats audio without the voice flag as plain audio', () => {
+    const f = fixture('webhook-whatsapp-voice-received');
+    const body = withPayload('webhook-whatsapp-voice-received', {
+      body: {
+        ...(f.data.payload.body as Record<string, unknown>),
+        audio: { id: '77', mime_type: 'audio/mpeg' },
+      },
+    });
+    expect(normalizeTelnyxMessage(body)?.payload.media?.kind).toBe('audio');
+  });
+
+  it('normalizes a WhatsApp document with its file name and caption', () => {
+    const event = normalizeTelnyxMessage(fixture('webhook-whatsapp-document-received'));
+    expect(event?.payload).toMatchObject({
+      body: 'Invoice attached',
+      media: { kind: 'document', mimeType: 'application/pdf', fileName: 'invoice-1042.pdf' },
+    });
+    expectValidForM3(event);
+  });
+
+  it('normalizes a WhatsApp video and a sticker', () => {
+    const video = normalizeTelnyxMessage(fixture('webhook-whatsapp-video-received'));
+    expect(video?.payload.media).toMatchObject({ kind: 'video', mimeType: 'video/mp4' });
+    expectValidForM3(video);
+    const sticker = normalizeTelnyxMessage(fixture('webhook-whatsapp-sticker-received'));
+    expect(sticker?.payload.media).toMatchObject({ kind: 'sticker', mimeType: 'image/webp' });
+    expect(sticker?.payload.body).toBeUndefined();
+    expectValidForM3(sticker);
+  });
+
+  it('drops a non-https media URL but keeps the media id', () => {
+    const body = withPayload('webhook-whatsapp-received', {
+      body: { type: 'image', image: { url: 'http://insecure.example.test/x', id: 'm1' } },
+    });
+    expect(normalizeTelnyxMessage(body)?.payload.media).toEqual({
+      kind: 'image',
+      mimeType: 'image/jpeg',
+      mediaId: 'm1',
+    });
+  });
+
+  it('normalizes a WhatsApp reaction and its removal', () => {
+    const event = normalizeTelnyxMessage(fixture('webhook-whatsapp-reaction-received'));
+    expect(event?.payload.reaction).toEqual({
+      targetId: expect.stringMatching(/^wamid\./),
+      emoji: '\u{1F44D}',
+    });
+    expect(event?.payload.body).toBeUndefined();
+    expectValidForM3(event);
+    const removed = withPayload('webhook-whatsapp-reaction-received', {
+      body: { type: 'reaction', reaction: { message_id: 'wamid.X' } },
+    });
+    expect(normalizeTelnyxMessage(removed)?.payload.reaction).toEqual({
+      targetId: 'wamid.X',
+      emoji: null,
+    });
+  });
+
+  it('keeps the reply target of a WhatsApp reply', () => {
+    const event = normalizeTelnyxMessage(fixture('webhook-whatsapp-reply-received'));
+    expect(event?.payload).toMatchObject({
+      body: 'Yes, that one',
+      replyToId: expect.stringMatching(/^wamid\./),
+    });
+    expectValidForM3(event);
+  });
+
+  it('ignores WhatsApp edits and revokes', () => {
+    for (const type of ['edit', 'revoke']) {
+      const body = withPayload('webhook-whatsapp-received', {
+        body: { type, [type]: { original_message_id: 'x' } },
+      });
+      expect(normalizeTelnyxMessage(body)).toBeNull();
+    }
+  });
+
+  it('keeps button replies and other types as plain words', () => {
+    const button = withPayload('webhook-whatsapp-received', {
+      body: { type: 'button', button: { text: 'Confirm' } },
+    });
+    expect(normalizeTelnyxMessage(button)?.payload.body).toBe('Confirm');
+    const location = withPayload('webhook-whatsapp-received', { body: { type: 'location' } });
+    expect(normalizeTelnyxMessage(location)?.payload.body).toBe('Shared a location.');
   });
 
   it('ignores a media-only MMS (MMS is out of scope)', () => {

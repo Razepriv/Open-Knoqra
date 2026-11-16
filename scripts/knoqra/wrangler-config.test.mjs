@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { parseJsonc } from './jsonc.mjs';
 import { API_BASE, fullSettings, WEB_BASE } from './test-helpers.mjs';
 import {
+  bucketNames,
   buildApiConfig,
   buildWebConfig,
   CONFIG_HEADER,
@@ -156,5 +157,20 @@ describe('renderConfig and queueNames', () => {
     assert.doesNotMatch(JSON.stringify(apiConfig), /localConnectionString/);
     assert.deepEqual(queueNames(api), ['knoqra-provider-events', 'knoqra-provider-events-dlq']);
     assert.equal(webConfig.services.find((s) => s.binding === 'API').service, 'knoqra-api');
+  });
+});
+
+describe('bucketNames', () => {
+  it('lists the bound R2 buckets once each', () => {
+    assert.deepEqual(
+      bucketNames({
+        r2_buckets: [
+          { binding: 'MEDIA', bucket_name: 'knoqra-media' },
+          { binding: 'OTHER', bucket_name: 'knoqra-media' },
+        ],
+      }),
+      ['knoqra-media'],
+    );
+    assert.deepEqual(bucketNames({}), []);
   });
 });

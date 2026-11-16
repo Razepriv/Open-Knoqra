@@ -10,9 +10,12 @@ import {
   isEndedCallState,
   voicemailsKey,
 } from './calls';
+import { channelsKey, conversationKey, conversationsRoot, sendersKey, threadKey } from './inbox';
+import { type Message, type ThreadData, upsertThreadMessage } from './inbox-cache';
+import { type RealtimeStatus, setRealtimeStatus } from './realtime-status';
 import { walletKey } from './wallet';
 
-export type RealtimeStatus = 'connecting' | 'open' | 'closed';
+export type { RealtimeStatus } from './realtime-status';
 
 const REALTIME_PATH = '/api/v1/realtime';
 const PING_INTERVAL_MS = 25_000;
@@ -107,10 +110,61 @@ function applyCall(queryClient: QueryClient, data: unknown): void {
   void queryClient.invalidateQueries({ queryKey: callsListRoot });
 }
 
+/** The fields the thread renders; anything less refetches the thread instead. */
+function isMessage(value: unknown): value is Message {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.conversationId === 'string' &&
+    typeof value.status === 'string' &&
+    typeof value.occurredAt === 'string' &&
+    Array.isArray(value.attachments) &&
+    Array.isArray(value.reactions)
+  );
+}
+
+/** A changed message lands in its thread's cache at once: new, status, file stored, reaction. */
+function applyMessage(queryClient: QueryClient, data: unknown): void {
+  if (!isRecord(data) || typeof data.conversationId !== 'string') return;
+  const { conversationId } = data;
+  if (isMessage(data.message)) {
+    const message = data.message;
+    queryClient.setQueryData<ThreadData>(threadKey(conversationId), (cached) =>
+      upsertThreadMessage(cached, message),
+    );
+  } else {
+    void queryClient.invalidateQueries({ queryKey: threadKey(conversationId) });
+  }
+}
+
+/** A conversation's summary changed (preview, unread, window): refetch the list and its detail. */
+function applyConversation(queryClient: QueryClient, data: unknown): void {
+  void queryClient.invalidateQueries({ queryKey: conversationsRoot });
+  if (isRecord(data) && typeof data.conversationId === 'string') {
+    void queryClient.invalidateQueries({ queryKey: conversationKey(data.conversationId) });
+  }
+}
+
+/** After a reconnect, the inbox may have missed frames: read it again once. */
+function refreshInbox(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: conversationsRoot });
+  void queryClient.invalidateQueries({ queryKey: ['conversation'] });
+  void queryClient.invalidateQueries({ queryKey: ['thread'] });
+  void queryClient.invalidateQueries({ queryKey: channelsKey });
+}
+
 function apply(queryClient: QueryClient, message: unknown): void {
   if (!isRecord(message)) return;
   const { type, data } = message;
-  if (type === 'call.updated') {
+  if (type === 'message.updated') {
+    applyMessage(queryClient, data);
+  } else if (type === 'conversation.updated') {
+    applyConversation(queryClient, data);
+  } else if (type === 'channels.updated') {
+    void queryClient.invalidateQueries({ queryKey: channelsKey });
+    void queryClient.invalidateQueries({ queryKey: sendersKey });
+    void queryClient.invalidateQueries({ queryKey: ['conversation'] });
+  } else if (type === 'call.updated') {
     applyCall(queryClient, data);
   } else if (type === 'wallet.updated') {
     if (isWallet(data)) queryClient.setQueryData(walletKey, data);
@@ -136,8 +190,8 @@ export interface StartRealtimeOptions {
 
 /**
  * Keeps one realtime socket alive and writes what it hears into the query cache. Reconnects with
- * backoff (1, 2, 4 ... 30 seconds) and refetches calls, wallet and voicemails after a reconnect, since
- * events may have been missed. Returns a function that stops it.
+ * backoff (1, 2, 4 ... 30 seconds) and refetches calls, wallet, voicemails and the inbox after a
+ * reconnect, since events may have been missed. Returns a function that stops it.
  */
 export function startRealtime(options: StartRealtimeOptions): () => void {
   const { url, queryClient, WebSocketCtor, onStatus } = options;
@@ -165,6 +219,7 @@ export function startRealtime(options: StartRealtimeOptions): () => void {
         void queryClient.invalidateQueries({ queryKey: callsRoot });
         void queryClient.invalidateQueries({ queryKey: walletKey });
         void queryClient.invalidateQueries({ queryKey: voicemailsKey });
+        refreshInbox(queryClient);
       }
       everOpened = true;
       stopPing();
@@ -231,7 +286,11 @@ export function useRealtime(options: UseRealtimeOptions = {}): { status: Realtim
       url: realtimeUrl(window.location),
       queryClient,
       WebSocketCtor,
-      onStatus: setStatus,
+      onStatus: (next) => {
+        setStatus(next);
+        // Shared with the Inbox, which polls only while the socket is not open.
+        setRealtimeStatus(next);
+      },
     });
   }, [queryClient, WebSocketCtor]);
 

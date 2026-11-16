@@ -20,8 +20,8 @@ const base: SetupFacts = {
 
 const TEN_DLC = {
   kind: 'external',
-  href: 'https://portal.telnyx.com/#/app/messaging/compliance',
-  label: 'Register in Telnyx',
+  href: '/inbox',
+  label: 'Enable SMS in the Inbox',
 };
 const WA = {
   kind: 'external',
@@ -80,7 +80,7 @@ describe('evaluateSetupChecks', () => {
     const checks = evaluateSetupChecks(base);
     expect(checks.map((c) => c.id)).toEqual([...SETUP_CHECK_IDS]);
     expect(checks.map((c) => c.title)).toEqual([
-      'Telnyx credential',
+      'Phone provider credential',
       'Number assigned',
       'Webhook reachable',
       '10DLC registration',
@@ -97,7 +97,9 @@ describe('evaluateSetupChecks', () => {
   it('uses the specified details', () => {
     const detail = (patch: Partial<SetupFacts>, id: SetupCheckId) =>
       evaluateSetupChecks({ ...base, ...patch }).find((c) => c.id === id)?.detail;
-    expect(detail({ lastPoll: 'auth_failed' }, 'credential')).toBe('Telnyx rejected the key');
+    expect(detail({ lastPoll: 'auth_failed' }, 'credential')).toBe(
+      'Your phone provider rejected the key',
+    );
     expect(detail({ provider: 'fake', lastPoll: null }, 'credential')).toBe(
       'Saved. Calls use the fake provider in development.',
     );
@@ -105,7 +107,7 @@ describe('evaluateSetupChecks', () => {
       'No webhook received yet. Place a test call.',
     );
     expect(detail({ tenDlc: 'none' }, 'ten_dlc')).toBe(
-      'Needs a live Telnyx account. US SMS sending waits for 10DLC.',
+      'Needs a live phone provider account. US SMS sending waits for US texting registration.',
     );
     expect(detail({ whatsapp: 'none' }, 'whatsapp')).toBe(
       'Needs Meta approval of your WhatsApp Business account.',

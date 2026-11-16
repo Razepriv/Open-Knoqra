@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import type {
   AuthorizedSmsRequest,
+  AuthorizedWhatsAppReaction,
   AuthorizedWhatsAppRequest,
+  FetchedMedia,
   MessagingProvider,
+  OutboundMedia,
   ProviderMessage,
   WhatsAppTemplateRef,
 } from '../types';
@@ -30,6 +33,12 @@ const OWNED_NUMBER_STATUSES: ReadonlySet<string> = new Set(['active', 'port-out-
 const DEFAULT_OWNERSHIP_TIMEOUT_MS = 10_000;
 /** How long a send waits for Telnyx before giving up. */
 const DEFAULT_SEND_TIMEOUT_MS = 15_000;
+/** How long an inbound media download may take to start answering. */
+const DEFAULT_MEDIA_TIMEOUT_MS = 30_000;
+/** WhatsApp caps captions at 1024 bytes; longer text is cut on a character boundary. */
+const MAX_CAPTION_BYTES = 1024;
+/** Media kinds WhatsApp lets carry a caption. */
+const CAPTIONED: ReadonlySet<OutboundMedia['kind']> = new Set(['image', 'video', 'document']);
 const E164 = /^\+[1-9]\d{6,14}$/;
 const errorBodySchema = z.object({
   errors: z.array(z.object({ code: z.union([z.string(), z.number()]) })).min(1),
@@ -43,6 +52,8 @@ export interface TelnyxMessagingProviderOptions {
   ownershipTimeoutMs?: number;
   /** The send requests' time limit; tests shorten it. */
   sendTimeoutMs?: number;
+  /** The media download's time limit; tests shorten it. */
+  mediaTimeoutMs?: number;
 }
 
 /** Sends SMS and WhatsApp messages through Telnyx's v2 messaging API. */
@@ -52,6 +63,7 @@ export class TelnyxMessagingProvider implements MessagingProvider {
   private readonly apiBase: string;
   private readonly ownershipTimeoutMs: number;
   private readonly sendTimeoutMs: number;
+  private readonly mediaTimeoutMs: number;
 
   constructor(opts: TelnyxMessagingProviderOptions) {
     this.#apiKey = opts.apiKey;
@@ -59,6 +71,7 @@ export class TelnyxMessagingProvider implements MessagingProvider {
     this.apiBase = opts.apiBase ?? DEFAULT_API_BASE;
     this.ownershipTimeoutMs = opts.ownershipTimeoutMs ?? DEFAULT_OWNERSHIP_TIMEOUT_MS;
     this.sendTimeoutMs = opts.sendTimeoutMs ?? DEFAULT_SEND_TIMEOUT_MS;
+    this.mediaTimeoutMs = opts.mediaTimeoutMs ?? DEFAULT_MEDIA_TIMEOUT_MS;
   }
 
   async sendSms(input: AuthorizedSmsRequest): Promise<ProviderMessage> {
@@ -69,20 +82,91 @@ export class TelnyxMessagingProvider implements MessagingProvider {
     });
   }
 
-  /** A template wins over `body`: a template send never falls back to free text. */
+  /**
+   * A template wins over everything: a template send never falls back to free text. Otherwise one
+   * file (with `body` as its caption where WhatsApp allows one) or the text. `replyTo` quotes a
+   * message by its wamid (`context.message_id`, Telnyx's "Reply Context" guide).
+   */
   async sendWhatsApp(input: AuthorizedWhatsAppRequest): Promise<ProviderMessage> {
-    const whatsappMessage =
+    const content: Record<string, unknown> | null =
       input.template !== undefined
         ? templateMessage(input.template)
-        : input.body !== undefined
-          ? { type: 'text', text: { body: input.body } }
-          : null;
-    if (whatsappMessage === null) throw new Error('WhatsApp send needs a body or a template');
+        : input.media !== undefined
+          ? mediaMessage(input.media, input.body)
+          : input.body !== undefined
+            ? { type: 'text', text: { body: input.body } }
+            : null;
+    if (content === null) throw new Error('WhatsApp send needs a body, a file or a template');
+    const whatsappMessage =
+      input.replyTo !== undefined && input.template === undefined
+        ? { ...content, context: { message_id: input.replyTo } }
+        : content;
     return this.send('/messages/whatsapp', input.idempotencyKey, {
       from: input.from,
       to: input.to,
       whatsapp_message: whatsappMessage,
     });
+  }
+
+  /** `{ type: 'reaction', reaction: { message_id, emoji } }`; an empty emoji removes it (Meta's rule). */
+  async sendWhatsAppReaction(input: AuthorizedWhatsAppReaction): Promise<ProviderMessage> {
+    return this.send('/messages/whatsapp', input.idempotencyKey, {
+      from: input.from,
+      to: input.to,
+      whatsapp_message: {
+        type: 'reaction',
+        reaction: { message_id: input.targetChannelMessageId, emoji: input.emoji },
+      },
+    });
+  }
+
+  /**
+   * Downloads an inbound WhatsApp file: the Telnyx-hosted `url` when the webhook carried one,
+   * otherwise `GET /whatsapp/media/{business_number}/{media_id}`, which answers the raw bytes with
+   * their MIME type. Both are requested with the key (harmless if the URL is public). Throws a
+   * TelnyxMessagingError (status and code only) on a non-200, a timeout, or a file over `maxBytes`.
+   */
+  async fetchWhatsAppMedia(input: {
+    businessNumber: string;
+    url?: string;
+    mediaId?: string;
+    maxBytes: number;
+  }): Promise<FetchedMedia> {
+    const target =
+      input.url !== undefined
+        ? input.url
+        : input.mediaId !== undefined && E164.test(input.businessNumber)
+          ? `${this.apiBase}/whatsapp/media/${encodeURIComponent(input.businessNumber)}/${encodeURIComponent(input.mediaId)}`
+          : null;
+    if (target === null || !/^https:\/\//.test(target)) {
+      throw new TelnyxMessagingError(0, 'invalid_media_reference');
+    }
+    let res: Response;
+    try {
+      res = await this.fetchImpl(target, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${this.#apiKey}` },
+        signal: AbortSignal.timeout(this.mediaTimeoutMs),
+      });
+    } catch (error) {
+      const timedOut = error instanceof DOMException && error.name === 'TimeoutError';
+      throw new TelnyxMessagingError(0, timedOut ? 'timeout' : 'network_error');
+    }
+    if (res.status !== 200 || res.body === null) {
+      throw new TelnyxMessagingError(
+        res.status,
+        res.status === 200 ? 'empty_body' : await errorCode(res),
+      );
+    }
+    const length = Number(res.headers.get('content-length'));
+    const size = Number.isFinite(length) && length > 0 ? length : null;
+    if (size !== null && size > input.maxBytes) {
+      await res.body.cancel();
+      throw new TelnyxMessagingError(413, 'media_too_large');
+    }
+    const contentType =
+      res.headers.get('content-type')?.slice(0, 128) || 'application/octet-stream';
+    return { body: res.body, contentType, size };
   }
 
   /**
@@ -144,7 +228,8 @@ export class TelnyxMessagingProvider implements MessagingProvider {
         // Telnyx may have accepted the message before the limit, so a blind retry could send twice.
         throw new TelnyxMessagingError(0, 'timeout', {
           code: 'provider_error',
-          message: 'Telnyx did not answer in time. The message may still have been sent.',
+          message:
+            'Your phone provider did not answer in time. The message may still have been sent.',
           retryable: false,
         });
       }
@@ -159,12 +244,49 @@ export class TelnyxMessagingProvider implements MessagingProvider {
       // Telnyx may have accepted the message, so a blind retry could send it twice.
       throw new TelnyxMessagingError(res.status, 'invalid_response', {
         code: 'provider_error',
-        message: 'Telnyx sent an unreadable response.',
+        message: 'Your phone provider sent an unreadable response.',
         retryable: false,
       });
     }
     return { providerMessageId: parsed.data.id, state: 'queued' };
   }
+}
+
+/** Cuts UTF-8 text to `max` bytes without splitting a character. */
+function capBytes(text: string, max: number): string {
+  const encoder = new TextEncoder();
+  if (encoder.encode(text).length <= max) return text;
+  let out = '';
+  let used = 0;
+  for (const char of text) {
+    const size = encoder.encode(char).length;
+    if (used + size > max) break;
+    out += char;
+    used += size;
+  }
+  return out;
+}
+
+/**
+ * One file (Telnyx's `WhatsappMedia`: `link`, `caption`, `filename`, `voice`). A voice note is sent
+ * as `audio` with `voice: true` (OGG/Opus, Meta's rule); captions only on images, videos and
+ * documents.
+ */
+function mediaMessage(media: OutboundMedia, body: string | undefined): Record<string, unknown> {
+  const type = media.kind === 'voice' ? 'audio' : media.kind;
+  const caption =
+    body?.trim() && CAPTIONED.has(media.kind)
+      ? capBytes(body.trim(), MAX_CAPTION_BYTES)
+      : undefined;
+  return {
+    type,
+    [type]: {
+      link: media.link,
+      ...(caption ? { caption } : {}),
+      ...(media.kind === 'document' && media.fileName ? { filename: media.fileName } : {}),
+      ...(media.kind === 'voice' ? { voice: true } : {}),
+    },
+  };
 }
 
 function templateMessage(template: WhatsAppTemplateRef) {

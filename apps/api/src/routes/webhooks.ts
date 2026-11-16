@@ -1,8 +1,10 @@
+import { emergencyCode } from '@knoqra/core';
 import { createDb, type ProviderCredentialRow, providerEventRaw, withTenant } from '@knoqra/db';
 import {
   FakeProvider,
   PlivoWebhookAdapter,
   TelnyxWebhookAdapter,
+  telnyxOutboundStart,
   type WebhookAdapter,
 } from '@knoqra/providers';
 import { and, eq, sql } from 'drizzle-orm';
@@ -15,6 +17,7 @@ import {
   openConnectionSecret,
 } from '../connectors/registry';
 import { connectionString, type Env } from '../env';
+import { hangUpEmergencyNow } from '../events/call-guard';
 import type { AppEnv } from '../lib/context';
 import { fail, ok } from '../lib/envelope';
 import { logger } from '../lib/logger';
@@ -54,6 +57,11 @@ export async function ingestWebhook(
      * namespaced by it, so no workspace can pre-empt another's event ids.
      */
     organizationId?: string;
+    /**
+     * Runs once the event is stored and queued, for a delivery that created its row (never for a
+     * duplicate). Must not throw or block: the emergency fast path schedules its work and returns.
+     */
+    afterStore?: (stored: { rawEventId: string; body: unknown }) => void;
   } = {},
 ): Promise<IngestResult> {
   if (!(await adapter.verify(headers, rawBody))) return { status: 401, error: 'invalid_signature' };
@@ -91,6 +99,7 @@ export async function ingestWebhook(
     const created = inserted[0];
     if (created) {
       await env.PROVIDER_EVENTS.send({ rawEventId: created.id });
+      opts.afterStore?.({ rawEventId: created.id, body: parsed.value.body });
       return { status: 200, duplicate: false };
     }
 
@@ -115,6 +124,47 @@ export async function ingestWebhook(
     await close().catch((error: unknown) => logger.warn('db.close_failed', { error }));
   }
 }
+
+/**
+ * The emergency fast path (`afterStore` for Telnyx deliveries). The queue delivers within its
+ * one-second batch window plus a consumer start, so a 911 call would ring for a second or more
+ * before the queue's guard cuts it. An outgoing `call.initiated` to an emergency number is hung up
+ * from here instead, as soon as it is stored and queued, after the response in `waitUntil`. Every
+ * other event returns at once. The queue's guard still runs: it finds the event already recorded,
+ * or hangs up and records it itself when this path could not.
+ */
+export function emergencyFastPath(
+  env: Env,
+  connectorOrgId: string | null,
+  deps: { waitUntil: (promise: Promise<unknown>) => void; fetch?: typeof fetch },
+): (stored: { rawEventId: string; body: unknown }) => void {
+  return ({ rawEventId, body }) => {
+    const start = telnyxOutboundStart(body);
+    if (start === null || emergencyCode(start.to) === null) return;
+    const task = (async () => {
+      const { db, close } = createDb(connectionString(env));
+      try {
+        await hangUpEmergencyNow(
+          { env, db, rawEventId, connectorOrgId, ...(deps.fetch ? { fetch: deps.fetch } : {}) },
+          body,
+        );
+      } finally {
+        await close().catch((error: unknown) => logger.warn('db.close_failed', { error }));
+      }
+    })();
+    try {
+      deps.waitUntil(task);
+    } catch {
+      // No execution context: the task still runs, just unawaited.
+    }
+  };
+}
+
+/** The request's `waitUntil`, for routes. */
+const waitUntilOf =
+  (c: { executionCtx: { waitUntil: (promise: Promise<unknown>) => void } }) =>
+  (promise: Promise<unknown>): void =>
+    c.executionCtx.waitUntil(promise);
 
 /** Webhook bodies above this size are rejected with a 413 before they are read. */
 export const WEBHOOK_MAX_BYTES = 256 * 1024;
@@ -203,7 +253,11 @@ export const webhooks = new Hono<AppEnv>()
     if (!adapter) return fail(c, 404, 'not_found', 'Unknown provider.');
 
     const rawBody = new Uint8Array(await c.req.arrayBuffer());
-    const result = await ingestWebhook(c.env, adapter, c.req.raw.headers, rawBody);
+    const result = await ingestWebhook(c.env, adapter, c.req.raw.headers, rawBody, {
+      ...(adapter.provider === 'telnyx'
+        ? { afterStore: emergencyFastPath(c.env, null, { waitUntil: waitUntilOf(c) }) }
+        : {}),
+    });
     if (result.status === 401) return fail(c, 401, 'invalid_signature', 'Signature check failed.');
     if (result.status === 400) return fail(c, 400, 'invalid_payload', 'Unrecognized payload.');
     if ('ignored' in result) return ok(c, { received: true, ignored: true });
@@ -222,6 +276,9 @@ export const webhooks = new Hono<AppEnv>()
     const rawBody = new Uint8Array(await c.req.arrayBuffer());
     const result = await ingestWebhook(c.env, adapter, c.req.raw.headers, rawBody, {
       organizationId: orgId,
+      ...(provider === 'telnyx'
+        ? { afterStore: emergencyFastPath(c.env, orgId, { waitUntil: waitUntilOf(c) }) }
+        : {}),
     });
     if (result.status === 401) return fail(c, 401, 'invalid_signature', 'Signature check failed.');
     if (result.status === 400) return fail(c, 400, 'invalid_payload', 'Unrecognized payload.');

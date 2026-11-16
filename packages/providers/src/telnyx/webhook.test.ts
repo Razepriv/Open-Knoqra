@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { runAdapterContract } from '../contract.test-helpers';
 import type { NormalizedEvent } from '../events';
+import { telnyxOutboundStart } from './normalize';
 import { TelnyxWebhookAdapter } from './webhook';
 
 /** Narrows to a call event. */
@@ -451,5 +452,49 @@ describe('TelnyxWebhookAdapter inbound calls with null fields', () => {
     );
     const call = callOf(adapter().normalize(body));
     expect(call).toMatchObject({ direction: 'outbound', from: '', to: '' });
+  });
+});
+
+describe('telnyxOutboundStart', () => {
+  it('reads an outgoing call.initiated', () => {
+    expect(telnyxOutboundStart(fixtureJson('call-initiated-outgoing'))).toEqual({
+      callControlId: 'v3:outgoing-call-1',
+      to: '+12025550123',
+      from: '+12025550101',
+      clientState: 'idem_key_1',
+      connectionId: 'conn-1',
+      occurredAt: '2026-11-11T10:00:00.000000Z',
+    });
+  });
+
+  it('reads a call without client state and a numeric connection id', () => {
+    const body = fixtureJson('call-initiated-outgoing');
+    body.data.payload.client_state = null;
+    body.data.payload.connection_id = 1234567890;
+    body.data.payload.to = 'sip:911@sip.telnyx.com';
+    expect(telnyxOutboundStart(body)).toMatchObject({
+      clientState: null,
+      connectionId: '1234567890',
+      to: 'sip:911@sip.telnyx.com',
+    });
+  });
+
+  it('never reads an incoming call, a call without a direction, or another event', () => {
+    const incoming = fixtureJson('call-initiated-outgoing');
+    incoming.data.payload.direction = 'incoming';
+    expect(telnyxOutboundStart(incoming)).toBeNull();
+    const noDirection = fixtureJson('call-initiated-outgoing');
+    noDirection.data.payload.direction = undefined;
+    expect(telnyxOutboundStart(noDirection)).toBeNull();
+    expect(telnyxOutboundStart(fixtureJson('call-answered'))).toBeNull();
+    expect(telnyxOutboundStart({ data: {} })).toBeNull();
+    expect(telnyxOutboundStart(null)).toBeNull();
+  });
+
+  it('keeps reading the event when connection_id has an unexpected shape', () => {
+    const body = fixtureJson('call-initiated-outgoing');
+    body.data.payload.connection_id = { nested: true };
+    expect(telnyxOutboundStart(body)?.connectionId).toBeNull();
+    expect(callOf(adapter().normalize(body))?.signal).toEqual({ type: 'dialing' });
   });
 });

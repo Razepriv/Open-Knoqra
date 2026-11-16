@@ -42,10 +42,18 @@ export interface Env {
   AI_MODEL?: string;
   /** Optional OpenAI-compatible base URL, for example `https://api.example.com/v1` (default OpenAI). */
   AI_BASE_URL?: string;
-  /** Leave unset until US 10DLC registration is approved. Gates live Telnyx SMS. */
+  /**
+   * Retired: live sending now follows each workspace's own registration status, read from its
+   * provider (US texting registration for SMS, Meta's approval for WhatsApp). Ignored if set.
+   */
   SMS_10DLC_APPROVED?: string;
-  /** Leave unset until Meta WhatsApp approval is confirmed. Gates live Telnyx WhatsApp. */
+  /** Retired, like SMS_10DLC_APPROVED: WhatsApp approval is read per workspace. Ignored if set. */
   WHATSAPP_META_APPROVED?: string;
+  /**
+   * R2 bucket for message attachments (WhatsApp images, voice notes, files). Optional: without it
+   * uploads answer 503 and inbound files show as unavailable.
+   */
+  MEDIA?: R2Bucket;
   /** Base64 Ed25519 public key for verifying Telnyx webhooks. Absent means `/webhooks/telnyx` is a 404. */
   TELNYX_PUBLIC_KEY?: string;
   /**

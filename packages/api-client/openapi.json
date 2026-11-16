@@ -1497,6 +1497,272 @@
           }
         }
       },
+      "MessagingChannels": {
+        "type": "object",
+        "properties": {
+          "sms": {
+            "$ref": "#/components/schemas/ChannelStatus"
+          },
+          "whatsapp": {
+            "$ref": "#/components/schemas/ChannelStatus"
+          }
+        },
+        "required": ["sms", "whatsapp"]
+      },
+      "ChannelStatus": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": ["sms", "whatsapp"]
+          },
+          "state": {
+            "type": "string",
+            "enum": ["not_enabled", "pending", "live", "rejected"]
+          },
+          "address": {
+            "type": ["string", "null"]
+          },
+          "displayName": {
+            "type": ["string", "null"]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "sandbox": {
+            "type": "boolean"
+          },
+          "enable": {
+            "type": "object",
+            "properties": {
+              "available": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string",
+                "enum": ["ok", "not_manager", "no_connection", "not_live", "done"]
+              }
+            },
+            "required": ["available", "reason"]
+          },
+          "registration": {
+            "$ref": "#/components/schemas/SmsRegistration"
+          }
+        },
+        "required": [
+          "channel",
+          "state",
+          "address",
+          "displayName",
+          "detail",
+          "sandbox",
+          "enable",
+          "registration"
+        ]
+      },
+      "SmsRegistration": {
+        "type": ["object", "null"],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "submitting",
+              "otp_required",
+              "brand_pending",
+              "campaign_pending",
+              "number_pending",
+              "approved",
+              "rejected",
+              "failed"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "enum": ["sole_proprietor", "private_profit", "public_profit", "non_profit"]
+          },
+          "phone": {
+            "type": "string"
+          },
+          "brandName": {
+            "type": "string"
+          },
+          "failureReason": {
+            "type": ["string", "null"]
+          },
+          "lastCheckedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "required": ["state", "entityType", "phone", "brandName", "failureReason", "lastCheckedAt"]
+      },
+      "SmsRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": ["sole_proprietor", "private_profit", "public_profit", "non_profit"]
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "brandName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "legalName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "ein": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "firstName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 100,
+            "format": "email"
+          },
+          "contactPhone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "street": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "state": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{2}$"
+          },
+          "postalCode": {
+            "type": "string",
+            "pattern": "^\\d{5}$"
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "vertical": {
+            "type": "string",
+            "enum": [
+              "AGRICULTURE",
+              "COMMUNICATION",
+              "CONSTRUCTION",
+              "EDUCATION",
+              "ENERGY",
+              "ENTERTAINMENT",
+              "FINANCIAL",
+              "GOVERNMENT",
+              "HEALTHCARE",
+              "HOSPITALITY",
+              "HUMAN_RESOURCES",
+              "INSURANCE",
+              "LEGAL",
+              "MANUFACTURING",
+              "NGO",
+              "PROFESSIONAL",
+              "REAL_ESTATE",
+              "RETAIL",
+              "TECHNOLOGY",
+              "TRANSPORTATION"
+            ]
+          },
+          "usecase": {
+            "type": "string",
+            "enum": ["CUSTOMER_CARE", "ACCOUNT_NOTIFICATION", "DELIVERY_NOTIFICATION", "MARKETING"]
+          },
+          "stockSymbol": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "stockExchange": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "messageFlow": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          },
+          "optinMessage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          },
+          "helpMessage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          },
+          "optoutMessage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          },
+          "sample1": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          },
+          "sample2": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4160
+          }
+        },
+        "required": [
+          "entityType",
+          "brandName",
+          "email",
+          "contactPhone",
+          "street",
+          "city",
+          "state",
+          "postalCode",
+          "vertical",
+          "messageFlow",
+          "description",
+          "optinMessage",
+          "helpMessage",
+          "optoutMessage",
+          "sample1",
+          "sample2"
+        ]
+      },
+      "SmsRegistrationCode": {
+        "type": "object",
+        "properties": {
+          "pin": {
+            "type": "string",
+            "pattern": "^\\d{4,10}$"
+          }
+        },
+        "required": ["pin"]
+      },
       "MessageTemplates": {
         "type": "object",
         "properties": {
@@ -1866,6 +2132,9 @@
           "providerMessageId": {
             "type": ["string", "null"]
           },
+          "clientMessageId": {
+            "type": ["string", "null"]
+          },
           "occurredAt": {
             "type": "string",
             "format": "date-time"
@@ -1873,6 +2142,24 @@
           "statusUpdatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageAttachment"
+            }
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageReaction"
+            }
+          },
+          "replyTo": {
+            "$ref": "#/components/schemas/MessageReplyPreview"
+          },
+          "replyable": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1887,9 +2174,104 @@
           "error",
           "authorUserId",
           "providerMessageId",
+          "clientMessageId",
           "occurredAt",
-          "statusUpdatedAt"
+          "statusUpdatedAt",
+          "attachments",
+          "reactions",
+          "replyTo",
+          "replyable"
         ]
+      },
+      "MessageAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["image", "audio", "voice", "video", "document", "sticker"]
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": ["integer", "null"]
+          },
+          "fileName": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "stored", "failed"]
+          },
+          "durationMs": {
+            "type": ["integer", "null"]
+          },
+          "waveform": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "integer"
+            }
+          },
+          "url": {
+            "type": ["string", "null"]
+          },
+          "urlExpiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "mimeType",
+          "sizeBytes",
+          "fileName",
+          "status",
+          "durationMs",
+          "waveform",
+          "url",
+          "urlExpiresAt"
+        ]
+      },
+      "MessageReaction": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["inbound", "outbound"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "sent", "failed"]
+          }
+        },
+        "required": ["emoji", "direction", "status"]
+      },
+      "MessageReplyPreview": {
+        "type": ["object", "null"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["inbound", "outbound"]
+          },
+          "body": {
+            "type": "string"
+          },
+          "attachmentKind": {
+            "type": ["string", "null"],
+            "enum": ["image", "audio", "voice", "video", "document", "sticker", null]
+          }
+        },
+        "required": ["id", "direction", "body", "attachmentKind"]
       },
       "ThreadNote": {
         "type": "object",
@@ -1940,9 +2322,30 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 64
+          },
+          "attachmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "replyToMessageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": ["clientMessageId"]
+      },
+      "SetReaction": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "One emoji; empty removes yours."
+          }
+        },
+        "required": ["emoji"]
       },
       "MessageDetail": {
         "allOf": [
@@ -6700,6 +7103,446 @@
         }
       }
     },
+    "/api/v1/messaging/channels": {
+      "get": {
+        "tags": ["messaging"],
+        "summary": "SMS and WhatsApp: not enabled, pending or live, and what Enable can do here",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessagingChannels"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messaging/sms/registration": {
+      "post": {
+        "tags": ["messaging"],
+        "summary": "Register for US business texting (10DLC) with your own phone provider account",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsRegistrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Channel status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessagingChannels"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can enable channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A registration is in progress, or no code is expected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Live sending is not available here, or no phone provider is connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The phone provider could not be reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messaging/sms/registration/code": {
+      "post": {
+        "tags": ["messaging"],
+        "summary": "Check the code texted to a sole proprietor's mobile",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsRegistrationCode"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Channel status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessagingChannels"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can enable channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A registration is in progress, or no code is expected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Live sending is not available here, or no phone provider is connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The phone provider could not be reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messaging/sms/registration/code/resend": {
+      "post": {
+        "tags": ["messaging"],
+        "summary": "Text the sole proprietor a new code",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessagingChannels"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can enable channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A registration is in progress, or no code is expected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Live sending is not available here, or no phone provider is connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The phone provider could not be reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messaging/channels/refresh": {
+      "post": {
+        "tags": ["messaging"],
+        "summary": "Check SMS and WhatsApp status with the phone provider now (sync, registration)",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessagingChannels"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can enable channels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A registration is in progress, or no code is expected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Live sending is not available here, or no phone provider is connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The phone provider could not be reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/messaging/templates": {
       "get": {
         "tags": ["messaging"],
@@ -7705,6 +8548,110 @@
         }
       }
     },
+    "/api/v1/messages/{id}/reaction": {
+      "put": {
+        "tags": ["conversations"],
+        "summary": "Set or remove the workspace's reaction to an inbound WhatsApp message",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The message with its reactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such message in the active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a reactable message, too old, or sending is not allowed now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/messages/{id}": {
       "get": {
         "tags": ["conversations"],
@@ -7758,6 +8705,252 @@
           },
           "404": {
             "description": "No such message in the active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/attachments": {
+      "post": {
+        "tags": ["conversations"],
+        "summary": "Upload a file to send on a WhatsApp conversation (raw body, Content-Type and Content-Length required); send it by naming its id in attachmentId",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "required": false,
+            "name": "name",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "name": "voice",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 3600000
+            },
+            "required": false,
+            "name": "durationMs",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 400
+            },
+            "required": false,
+            "name": "waveform",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored draft file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageAttachment"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation in the active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "411": {
+            "description": "Content-Length is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Larger than WhatsApp allows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a WhatsApp conversation, or a type WhatsApp cannot send",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "File storage is not set up on this server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/attachments/{id}": {
+      "get": {
+        "tags": ["conversations"],
+        "summary": "One attachment with a fresh signed link",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attachment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MessageAttachment"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such attachment in the active organization",
             "content": {
               "application/json": {
                 "schema": {

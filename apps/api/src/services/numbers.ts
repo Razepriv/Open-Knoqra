@@ -22,17 +22,38 @@ export interface SyncResult {
 const CALLS_USES: readonly AssignedUse[] = ['calls', 'calls_and_messages'];
 export const usesCalls = (use: AssignedUse): boolean => CALLS_USES.includes(use);
 
+/**
+ * The columns a listed number sets. WhatsApp's columns are left alone when the provider could not
+ * read its WhatsApp facts this time (`whatsappSynced: false`, an outage).
+ */
 function columnsOf(n: ProviderNumber, now: Date) {
+  const whatsapp =
+    n.whatsappSynced === false
+      ? {}
+      : {
+          whatsapp: n.capabilities.whatsapp,
+          whatsappStatus: n.whatsapp,
+          whatsappDisplayName: n.whatsappDetail?.displayName ?? null,
+          whatsappQualityRating: n.whatsappDetail?.qualityRating ?? null,
+        };
   return {
     e164: n.e164,
     status: n.status,
     voice: n.capabilities.voice,
     sms: n.capabilities.sms,
     mms: n.capabilities.mms,
-    whatsapp: n.capabilities.whatsapp,
     tenDlcStatus: n.tenDlc,
-    whatsappStatus: n.whatsapp,
+    ...whatsapp,
     lastSyncedAt: now,
+  };
+}
+
+/** Columns for a number new to the table: WhatsApp unknown means none yet. */
+function insertColumnsOf(n: ProviderNumber, now: Date) {
+  return {
+    whatsapp: false,
+    whatsappStatus: 'none' as const,
+    ...columnsOf(n, now),
   };
 }
 
@@ -73,7 +94,7 @@ export async function syncNumbers(
           organizationId: orgId,
           provider,
           providerNumberId: n.providerNumberId,
-          ...columnsOf(n, now),
+          ...insertColumnsOf(n, now),
         })
         .returning({ id: phoneNumber.id });
       if (created) seen.add(created.id);
@@ -96,8 +117,13 @@ export async function syncNumbers(
       );
     result.deactivated = gone.length;
   }
-  // M3's live senders follow the synced numbers (ruling AQ); a fake sync has no telnyx numbers.
-  if (provider === 'telnyx') await refreshTelnyxSenders(tx);
+  // Live senders follow the synced numbers (ruling AQ); a fake sync has no telnyx numbers.
+  if (provider === 'telnyx') {
+    await refreshTelnyxSenders(tx, {
+      orgId,
+      whatsappSynced: listed.every((n) => n.whatsappSynced !== false),
+    });
+  }
   return result;
 }
 

@@ -1,4 +1,11 @@
-import { MESSAGE_STATUSES, MESSAGING_CHANNELS, newId, REGISTRATION_STATUSES } from '@knoqra/core';
+import {
+  ATTACHMENT_KINDS,
+  ATTACHMENT_STATUSES,
+  MESSAGE_STATUSES,
+  MESSAGING_CHANNELS,
+  newId,
+  REGISTRATION_STATUSES,
+} from '@knoqra/core';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -6,6 +13,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -215,6 +223,17 @@ export const message = pgTable(
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
     statusUpdatedAt: timestamp('status_updated_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
+    /** The channel's own id for the message (WhatsApp's wamid), for replies and reactions. */
+    channelMessageId: text('channel_message_id'),
+    /** The message (same conversation) this one replies to. */
+    replyToMessageId: text('reply_to_message_id'),
+    /**
+     * The provider request of a queued outbound message, written with it and cleared once the
+     * provider answered. Never credentials.
+     */
+    dispatchPayload: jsonb('dispatch_payload'),
+    /** Set by the one worker that hands the message to the provider (exactly once). */
+    dispatchClaimedAt: timestamp('dispatch_claimed_at', { withTimezone: true }),
   },
   (table) => [
     foreignKey({
@@ -237,6 +256,10 @@ export const message = pgTable(
       table.clientMessageId,
     ),
     unique('message_organization_id_id_unique').on(table.organizationId, table.id),
+    index('message_channel_message_idx').on(table.organizationId, table.channelMessageId),
+    index('message_dispatch_idx')
+      .on(table.createdAt)
+      .where(sql`${table.status} = 'queued' and ${table.dispatchPayload} is not null`),
     index('message_conversation_idx').on(
       table.conversationId,
       table.occurredAt.desc().nullsFirst(),
@@ -281,6 +304,112 @@ export const messageStatusEvent = pgTable(
   ],
 );
 
+export const ATTACHMENT_DIRECTIONS = MESSAGE_DIRECTIONS;
+
+/**
+ * A file carried by a message: an image, voice note, audio, video, document or sticker. An outbound
+ * upload is a draft (no `message_id`) until a send names it. The bytes live in object storage under
+ * `storage_key`; an inbound file is `pending` until it is downloaded from the provider.
+ */
+export const messageAttachment = pgTable(
+  'message_attachment',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => newId('ma')),
+    organizationId: orgId(),
+    conversationId: text('conversation_id').notNull(),
+    messageId: text('message_id'),
+    direction: text('direction', { enum: MESSAGE_DIRECTIONS }).notNull(),
+    kind: text('kind', { enum: ATTACHMENT_KINDS }).notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes'),
+    fileName: text('file_name'),
+    status: text('status', { enum: ATTACHMENT_STATUSES }).notNull().default('pending'),
+    storageKey: text('storage_key'),
+    /** Inbound: the provider's media id, for downloading it when no hosted URL came. */
+    providerMediaId: text('provider_media_id'),
+    /** Inbound: the provider-hosted URL. Server-side only, never sent to the Desk. */
+    sourceUrl: text('source_url'),
+    sha256: text('sha256'),
+    durationMs: integer('duration_ms'),
+    /** Up to 48 comma-separated bars from 0 to 100 (core WAVEFORM_BARS). */
+    waveform: text('waveform'),
+    uploadedBy: text('uploaded_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'message_attachment_message_fk',
+      columns: [table.organizationId, table.messageId],
+      foreignColumns: [message.organizationId, message.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'message_attachment_conversation_fk',
+      columns: [table.organizationId, table.conversationId],
+      foreignColumns: [conversation.organizationId, conversation.id],
+    }).onDelete('cascade'),
+    index('message_attachment_message_idx').on(table.messageId),
+    check(
+      'message_attachment_direction_check',
+      sql`${table.direction} in (${inList(MESSAGE_DIRECTIONS)})`,
+    ),
+    check('message_attachment_kind_check', sql`${table.kind} in (${inList(ATTACHMENT_KINDS)})`),
+    check(
+      'message_attachment_status_check',
+      sql`${table.status} in (${inList(ATTACHMENT_STATUSES)})`,
+    ),
+    check(
+      'message_attachment_size_check',
+      sql`${table.sizeBytes} is null or ${table.sizeBytes} >= 0`,
+    ),
+    check('message_attachment_organization_id_not_empty', sql`${table.organizationId} <> ''`),
+  ],
+);
+
+export const REACTION_STATUSES = ['pending', 'sent', 'failed'] as const;
+export type ReactionStatus = (typeof REACTION_STATUSES)[number];
+
+/**
+ * One emoji reaction per side per message: `inbound` is the contact's, `outbound` the workspace's.
+ * Removing a reaction deletes its row.
+ */
+export const messageReaction = pgTable(
+  'message_reaction',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => newId('mr')),
+    organizationId: orgId(),
+    messageId: text('message_id').notNull(),
+    direction: text('direction', { enum: MESSAGE_DIRECTIONS }).notNull(),
+    emoji: text('emoji').notNull(),
+    status: text('status', { enum: REACTION_STATUSES }).notNull().default('sent'),
+    actorUserId: text('actor_user_id'),
+    errorMessage: text('error_message'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'message_reaction_message_fk',
+      columns: [table.organizationId, table.messageId],
+      foreignColumns: [message.organizationId, message.id],
+    }).onDelete('cascade'),
+    unique('message_reaction_message_direction_unique').on(table.messageId, table.direction),
+    check(
+      'message_reaction_direction_check',
+      sql`${table.direction} in (${inList(MESSAGE_DIRECTIONS)})`,
+    ),
+    check('message_reaction_status_check', sql`${table.status} in (${inList(REACTION_STATUSES)})`),
+    check('message_reaction_emoji_not_empty', sql`${table.emoji} <> ''`),
+    check('message_reaction_organization_id_not_empty', sql`${table.organizationId} <> ''`),
+  ],
+);
+
+export type MessageAttachment = typeof messageAttachment.$inferSelect;
+export type MessageReaction = typeof messageReaction.$inferSelect;
 export type ChannelConnection = typeof channelConnection.$inferSelect;
 export type ChannelRoute = typeof channelRoute.$inferSelect;
 export type Conversation = typeof conversation.$inferSelect;

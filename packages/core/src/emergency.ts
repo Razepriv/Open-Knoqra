@@ -25,14 +25,28 @@ const N11 = /^[2-9]11$/;
 
 const DIALABLE = /^[\s\d+()\-.]*$/;
 
+/** `sip:911@host;user=phone`, `sips:+1911@host` or `tel:911`: the dialed part of a provider URI. */
+const URI = /^(?:sips?|tel):([^@;]*)/i;
+
+/**
+ * The emergency or special short code a destination dials ('911', '112' and so on), or null.
+ * Accepts what a person types (with or without a +1 or +91 prefix) and what a provider reports for
+ * a call's destination, which can be a SIP or tel URI. Never throws; a non-string is not one.
+ */
+export function emergencyCode(input: string): string | null {
+  if (typeof input !== 'string') return null;
+  const dialed = URI.exec(input.trim())?.[1] ?? input;
+  if (!DIALABLE.test(dialed)) return null;
+  let digits = dialed.replace(/\D/g, '');
+  if (digits.length === 4 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length === 5 && digits.startsWith('91')) digits = digits.slice(2);
+  return EMERGENCY_CODES.has(digits) || N11.test(digits) ? digits : null;
+}
+
 /**
  * Whether a typed destination is an emergency or special short code, with or without a +1 or +91
  * prefix. Never throws; a non-string is not an emergency number.
  */
 export function isEmergencyNumber(input: string): boolean {
-  if (typeof input !== 'string' || !DIALABLE.test(input)) return false;
-  let digits = input.replace(/\D/g, '');
-  if (digits.length === 4 && digits.startsWith('1')) digits = digits.slice(1);
-  if (digits.length === 5 && digits.startsWith('91')) digits = digits.slice(2);
-  return EMERGENCY_CODES.has(digits) || N11.test(digits);
+  return emergencyCode(input) !== null;
 }

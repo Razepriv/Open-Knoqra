@@ -98,7 +98,7 @@ describe('purchaseFailure', () => {
 
   it('words a provider outage and hides unknown errors', () => {
     expect(purchaseFailure(new ApiError(502, 'x', 'provider_unavailable')).message).toBe(
-      'Telnyx did not answer. Try again in a minute.',
+      'Your phone provider did not answer. Try again in a minute.',
     );
     expect(purchaseFailure(new Error('boom: secret')).message).toBe(
       'Something went wrong. Try again in a moment.',

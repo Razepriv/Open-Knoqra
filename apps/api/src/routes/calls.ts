@@ -215,38 +215,40 @@ export const calls = new OpenAPIHono<AppEnv>()
     const { db, tenant } = c.var;
     const body = c.req.valid('json');
 
-    // 1. Idempotent replay: the same key returns the same call and dial.
-    const replay = await withTenant(db, tenant.orgId, async (tx) => {
+    // 1. Idempotent replay (the same key returns the same call and dial), else 2. consent and
+    // 3. a voice provider: one transaction, so a dial pays for one round of BEGIN/COMMIT, not two.
+    const first = await withTenant(db, tenant.orgId, async (tx) => {
       const found = await findCallWithContact(
         tx,
         and(eq(call.userId, tenant.userId), eq(call.idempotencyKey, body.idempotencyKey)),
       );
-      if (!found) return undefined;
-      const summary = await walletSummary(
-        tx,
-        await openWallet(tx, c.env, tenant.orgId),
-        new Date(),
-        callBillingOf(c.env),
-      );
-      return { found, summary };
+      if (found) {
+        const summary = await walletSummary(
+          tx,
+          await openWallet(tx, c.env, tenant.orgId),
+          new Date(),
+          callBillingOf(c.env),
+        );
+        return { kind: 'replay' as const, found, summary };
+      }
+      return {
+        kind: 'new' as const,
+        target: await resolveTarget(tx, body, false),
+        choice: await loadVoiceChoice(tx, c.env),
+      };
     });
-    if (replay) {
+    if (first.kind === 'replay') {
       return ok(
         c,
         {
-          call: toCallJson(replay.found),
-          dial: dialOf(replay.found.row),
-          warnings: warningsOf(replay.summary.status),
+          call: toCallJson(first.found),
+          dial: dialOf(first.found.row),
+          warnings: warningsOf(first.summary.status),
         },
         200,
       );
     }
-
-    // 2. Consent, and 3. a voice provider.
-    const pre = await withTenant(db, tenant.orgId, async (tx) => ({
-      target: await resolveTarget(tx, body, false),
-      choice: await loadVoiceChoice(tx, c.env),
-    }));
+    const pre = first;
     if (pre.target.kind !== 'ok') return targetFailure(c, pre.target);
     const refusal = consentRefusal(pre.target.decision, body.reviewConfirmed === true);
     if (refusal) {
@@ -291,8 +293,10 @@ export const calls = new OpenAPIHono<AppEnv>()
       throw error;
     }
 
-    // 7. Tell every open client.
-    await publish(c.env, tenant.orgId, { type: 'call.updated', data: created.json });
+    // 7. Tell every open client, after the response: the caller already has the call.
+    c.executionCtx.waitUntil(
+      publish(c.env, tenant.orgId, { type: 'call.updated', data: created.json }),
+    );
     return ok(
       c,
       { call: created.json, dial: dialOf(created.row), warnings: created.warnings },

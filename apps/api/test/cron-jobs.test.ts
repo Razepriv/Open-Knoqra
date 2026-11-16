@@ -24,6 +24,8 @@ describe('CRON_JOBS', () => {
       { name: 'stale-call-sweep', cron: '*/5 * * * *', maxIntervalMinutes: 5 },
       { name: 'balance-poll', cron: '*/30 * * * *', maxIntervalMinutes: 90 },
       { name: 'ledger-reconcile', cron: '15 3 * * *', maxIntervalMinutes: 1500 },
+      { name: 'message-dispatch-sweep', cron: '*/5 * * * *', maxIntervalMinutes: 5 },
+      { name: 'messaging-status', cron: '*/30 * * * *', maxIntervalMinutes: 90 },
     ]);
   });
 

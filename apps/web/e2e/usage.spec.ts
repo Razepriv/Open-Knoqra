@@ -6,7 +6,8 @@ import { PIPELINE, placeBilledCall, todayUtc, waitForAvailable } from './usage-h
 test.describe.configure({ timeout: 90_000 });
 
 const FORMULA_NOTE = '=HYPERLINK("x")';
-const PROVIDER_LOW = 'Your Telnyx balance is low. Top it up in Telnyx to keep calling.';
+const PROVIDER_LOW =
+  'Your phone provider balance is low. Top it up with your provider to keep calling.';
 
 async function addCredit(page: Page, amountMicros: number, note: string): Promise<void> {
   const response = await page.request.post('/api/v1/wallet/credits', {

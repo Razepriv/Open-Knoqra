@@ -94,5 +94,13 @@ export function createCloudflare({ token, fetch, dryRun = false, onRequest }) {
     async createQueue(accountId, name) {
       await call('POST', `/accounts/${accountId}/queues`, { queue_name: name });
     },
+    /** The names of the account's R2 buckets. */
+    async listBuckets(accountId) {
+      const json = await call('GET', `/accounts/${accountId}/r2/buckets?per_page=1000`);
+      return (json.result?.buckets ?? []).map((b) => b.name);
+    },
+    async createBucket(accountId, name) {
+      await call('POST', `/accounts/${accountId}/r2/buckets`, { name });
+    },
   };
 }

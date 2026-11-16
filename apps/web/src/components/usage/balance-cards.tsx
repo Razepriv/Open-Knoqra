@@ -75,7 +75,7 @@ function NoSnapshot({ canRefresh }: { canRefresh: boolean }) {
   if (setup.isPending) {
     return (
       <div className={`${cellSurface} flex flex-col items-start gap-3`}>
-        <Slot height={20} width={120} label="Loading Telnyx connection" />
+        <Slot height={20} width={120} label="Loading your phone provider connection" />
         <Slot height={18} width="80%" />
         <Slot height={34} width={140} />
       </div>
@@ -88,12 +88,12 @@ function NoSnapshot({ canRefresh }: { canRefresh: boolean }) {
       <div className={`${cellSurface} flex flex-col items-start gap-3`}>
         <StatusDot status="none" label="Not checked yet" />
         <p className="text-[13px] text-[color:var(--muted)] leading-snug">
-          The Telnyx balance has not been read yet.
+          The provider balance has not been read yet.
         </p>
         {canRefresh ? <RefreshButton refresh={refresh} /> : null}
         {refresh.isError ? (
           <p role="alert" className="text-[13px] text-[color:var(--danger-text)]">
-            Could not refresh the Telnyx balance. Try again.
+            Could not refresh the provider balance. Try again.
           </p>
         ) : null}
       </div>
@@ -103,10 +103,10 @@ function NoSnapshot({ canRefresh }: { canRefresh: boolean }) {
     <div className={`${cellSurface} flex flex-col items-start gap-3`}>
       <StatusDot status="none" label="Not connected" />
       <p className="text-[13px] text-[color:var(--muted)] leading-snug">
-        Connect Telnyx to see your provider balance here.
+        Connect your phone provider to see its balance here.
       </p>
       <a href={CONNECT_TELNYX_PATH} className={textPill}>
-        Connect Telnyx
+        Connect your phone provider
       </a>
     </div>
   );
@@ -118,8 +118,8 @@ function ProviderCard({ provider }: { provider: ProviderSnapshot }) {
   const now = useNow(MINUTE_MS);
   const canRefresh = me.data ? MANAGER_ROLES.has(me.data.organization.role) : false;
   return (
-    <Panel aria-label="Telnyx balance" className="flex flex-col gap-4 p-5 sm:p-6">
-      <h2 className={sectionHeading}>Telnyx balance</h2>
+    <Panel aria-label="Provider balance" className="flex flex-col gap-4 p-5 sm:p-6">
+      <h2 className={sectionHeading}>Provider balance</h2>
       {provider ? (
         <div className={`${cellSurface} flex flex-col gap-3`}>
           <span className={eyebrow}>Provider balance</span>
@@ -138,7 +138,7 @@ function ProviderCard({ provider }: { provider: ProviderSnapshot }) {
           </div>
           {refresh.isError ? (
             <p role="alert" className="text-[13px] text-[color:var(--danger-text)]">
-              Could not refresh the Telnyx balance. Try again.
+              Could not refresh the provider balance. Try again.
             </p>
           ) : null}
         </div>

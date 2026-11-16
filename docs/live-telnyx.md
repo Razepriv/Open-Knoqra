@@ -31,7 +31,7 @@ M2 is built and tested against the fake provider. Before any real call goes thro
 - [ ] Sign in as the workspace owner and save the org's **Telnyx API key**, connection id and caller id in **Settings, Voice**. Saving does not call Telnyx, so a wrong key shows up at the first token request (a 502) rather than on save.
 - [ ] Make sure the API runs with `PROVIDER=connectors` (`pnpm knoqra deploy` sets it).
 - [ ] Record the credit you hold with Telnyx under Wallet (`POST /api/v1/wallet/credits`), then place a test call to a number you control.
-- [ ] Live SMS and WhatsApp need US 10DLC registration and Meta approval first; then set `SMS_10DLC_APPROVED` and `WHATSAPP_META_APPROVED` to `true` and pick a sender in the Inbox.
+- [ ] Live SMS needs US texting (10DLC) registration: press Enable next to SMS in the Inbox. Live WhatsApp needs a WhatsApp Business number connected in the Telnyx portal: press Enable next to WhatsApp, then Check again. Both switch on by themselves when approved.
 
 Known gaps in M2 (tracked for later milestones):
 

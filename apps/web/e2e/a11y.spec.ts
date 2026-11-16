@@ -265,7 +265,7 @@ for (const theme of THEMES) {
       await page.getByRole('button', { name: 'Continue' }).click();
       await expect(page.getByRole('heading', { level: 2, name: 'Choose a number' })).toBeVisible();
       await scan('setup number step');
-      await page.getByRole('button', { name: 'Sync from Telnyx' }).click();
+      await page.getByRole('button', { name: 'Sync numbers' }).click();
       await expect(page.getByRole('radio')).toHaveCount(3, { timeout: 20_000 });
       await scan('setup number step, synced');
       await page.getByRole('radio', { name: /\+1 202 555 0100/ }).check();

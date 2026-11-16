@@ -118,3 +118,44 @@ export function normalizeTelnyx(body: unknown): NormalizedEvent | null {
     orgHint: null,
   };
 }
+
+/** An outbound call Telnyx has just started, as the call guard needs it. */
+export interface TelnyxOutboundStart {
+  callControlId: string;
+  /** The destination as Telnyx reports it: E.164, digits, or a SIP URI for a WebRTC call. */
+  to: string;
+  from: string | null;
+  /** Decoded; null when the call carries none (or an undecodable one). */
+  clientState: string | null;
+  /** The Telnyx connection that placed the call, when reported. */
+  connectionId: string | null;
+  occurredAt: string;
+}
+
+/**
+ * A `call.initiated` that Telnyx explicitly reports as outgoing, or null for anything else.
+ * Unlike `normalizeTelnyx`, a missing direction is never taken as outbound: the call guard hangs
+ * these calls up and must never touch an inbound call.
+ */
+export function telnyxOutboundStart(body: unknown): TelnyxOutboundStart | null {
+  const envelope = envelopeSchema.safeParse(body);
+  if (!envelope.success || envelope.data.data.event_type !== 'call.initiated') return null;
+  const { payload } = envelope.data.data;
+  const p = parseCallPayload(payload);
+  if (p === null || p.direction !== 'outgoing' || p.to === undefined) return null;
+  // Read on its own so an unexpected shape never makes the rest of the event unreadable.
+  const connectionId = payload.connection_id;
+  return {
+    callControlId: p.call_control_id,
+    to: p.to,
+    from: p.from ?? null,
+    clientState: p.client_state === undefined ? null : base64ToUtf8(p.client_state),
+    connectionId:
+      typeof connectionId === 'string' && connectionId !== ''
+        ? connectionId
+        : typeof connectionId === 'number'
+          ? String(connectionId)
+          : null,
+    occurredAt: envelope.data.data.occurred_at,
+  };
+}

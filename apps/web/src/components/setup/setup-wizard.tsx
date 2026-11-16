@@ -79,7 +79,8 @@ function Summary({ onClose }: { onClose: () => void }) {
           You're set up.
         </h2>
         <p className="max-w-[52ch] text-[14px] text-[color:var(--muted)] leading-relaxed">
-          Telnyx is connected, a number is chosen, your audio works and a test call went through.
+          Your phone provider is connected, a number is chosen, your audio works and a test call
+          went through.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link

@@ -32,9 +32,9 @@ import {
 } from '../messaging/senders';
 import { lockNumbers } from '../services/numbers';
 import {
+  registrationFor,
   registrationIsSynced,
   sendableFor,
-  smsRegistration,
 } from '../services/sender-registration';
 import { adapterFor } from './webhooks';
 
@@ -63,15 +63,15 @@ const SandboxBody = z
   .openapi('UpdateSandbox');
 const SandboxResult = z.object({ items: z.array(SenderSchema) }).openapi('SandboxSenders');
 /**
- * SMS takes its registration status from the synced number's 10DLC state (ruling AQ), so a
- * `registrationStatus` for SMS is refused with 400 rather than silently dropped. WhatsApp needs one:
- * the owner or admin sets it until M4's sync reads Meta's state from Telnyx (ruling AR).
+ * Both channels take their registration status from the synced number (10DLC for SMS, Meta's
+ * approval for WhatsApp), so a `registrationStatus` in the body is refused with 400 rather than
+ * silently dropped. The field stays in the schema for older clients.
  */
 const SenderBody = z
   .object({
     /** E.164. Defaults to the caller id saved with the Telnyx credential. */
     address: z.string().min(1).max(32).optional(),
-    /** WhatsApp only, and required there. SMS follows the synced 10DLC state. */
+    /** Refused: the status comes from the synced number on both channels. */
     registrationStatus: z.enum(REGISTRATION_STATUSES).optional(),
   })
   .openapi('UpdateSender');
@@ -148,7 +148,11 @@ const SENDER_REFUSALS = {
     code: 'not_configured',
     copy: "Live sending isn't available on this deployment.",
   },
-  no_credential: { status: 422, code: 'validation_error', copy: 'Connect Telnyx first.' },
+  no_credential: {
+    status: 422,
+    code: 'validation_error',
+    copy: 'Connect your phone provider first.',
+  },
   address_required: {
     status: 400,
     code: 'validation_error',
@@ -162,7 +166,7 @@ const SENDER_REFUSALS = {
   status_synced: {
     status: 400,
     code: 'validation_error',
-    copy: 'registrationStatus: The SMS status comes from your synced numbers.',
+    copy: 'registrationStatus: The status comes from your synced numbers.',
   },
   status_required: {
     status: 400,
@@ -178,32 +182,32 @@ const SENDER_REFUSALS = {
   provider_auth: {
     status: 422,
     code: 'provider_auth',
-    copy: 'Telnyx did not accept the saved API key.',
+    copy: 'Your phone provider did not accept the saved API key.',
   },
   provider_error: {
     status: 502,
     code: 'internal_error',
-    copy: 'Telnyx could not be reached. Try again in a moment.',
+    copy: 'Your phone provider could not be reached. Try again in a moment.',
   },
   not_synced: {
     status: 422,
     code: 'number_not_synced',
-    copy: 'Sync your numbers, then choose an active Telnyx number.',
+    copy: 'Sync your numbers, then choose an active number.',
   },
   not_capable: {
     status: 422,
     code: 'number_not_synced',
-    copy: "This number can't send on this channel in Telnyx.",
+    copy: "This number can't send on this channel yet.",
   },
   not_owned: {
     status: 422,
     code: 'number_not_owned',
-    copy: "This number isn't in your Telnyx account.",
+    copy: "This number isn't in your phone provider account.",
   },
   credential_changed: {
     status: 409,
     code: 'credential_changed',
-    copy: 'The Telnyx connection changed while saving. Try again.',
+    copy: 'Your phone connection changed while saving. Try again.',
   },
   // Generic on purpose, like voice's NUMBER_CONFLICT: it must not reveal another customer exists.
   address_in_use: {
@@ -419,9 +423,9 @@ async function writeTelnyxSender(
   const sendable = sendableFor(synced, channel);
   if (sendable !== 'ok') throw new SenderRefused(sendable);
   if (!synced) throw new SenderRefused('not_synced');
-  // SMS: the synced 10DLC state. WhatsApp: the owner's (resolveSender required it).
+  // The synced number's state: 10DLC for SMS, Meta's approval for WhatsApp.
   const registrationStatus = registrationIsSynced(channel)
-    ? smsRegistration(synced)
+    ? registrationFor(synced, channel)
     : (requested ?? 'pending');
 
   const [existing] = await tx

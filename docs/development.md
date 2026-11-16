@@ -66,7 +66,7 @@ The API reads secrets for `wrangler dev` from `apps/api/.dev.vars`, which is git
 | `CONNECTORS` | Optional. Comma list of the providers a workspace may connect in Settings › Connectors (`telnyx`, `plivo`). Unset: every provider outside production, and only live-verified ones (`telnyx`) in production |
 | `API_PUBLIC_ORIGIN` | Optional. The API's public origin, for example `https://api.example.com`. Settings › Connectors then shows each connection's full webhook URLs, not just their paths |
 | `TELNYX_PUBLIC_KEY` | Optional. Base64 Ed25519 platform webhook key. Unset, `/webhooks/telnyx` is a 404, which is what you want locally |
-| `SMS_10DLC_APPROVED`, `WHATSAPP_META_APPROVED` | Optional. Commented out in the example. Exactly `true` lets that channel send live through Telnyx when `PROVIDER=telnyx`. Leave them unset locally |
+| `SMS_10DLC_APPROVED`, `WHATSAPP_META_APPROVED` | Retired and ignored: live sending follows each workspace's own registration status, read from its provider |
 | `SENTRY_DSN`, `SENTRY_RELEASE`, `SENTRY_TRACES_SAMPLE_RATE` | Optional. Commented out in the example. Blank or unset means Sentry is off |
 | `POSTHOG_KEY`, `POSTHOG_HOST` | Optional. Commented out in the example. Blank or unset means server-side PostHog is off |
 
@@ -237,7 +237,7 @@ Messaging needs no Telnyx account. In development and staging (never production)
 
 Registration is per connection, so you can show the paused state by leaving a channel `pending`. The sandbox refuses a channel that already has a live Telnyx sender (422).
 
-Live Telnyx sending needs all of: `PROVIDER=telnyx`, a saved Telnyx connection, the channel flag set to exactly `true` (`SMS_10DLC_APPROVED` or `WHATSAPP_META_APPROVED`, commented out in `.dev.vars.example`), and an approved live sender on a number from a real Telnyx account. Without them the composer stays paused, so a local setup never sends a real message. See [Messaging](architecture.md#messaging-m3) and [Running on a live Telnyx account](live-telnyx.md).
+Live Telnyx sending needs all of: `PROVIDER=telnyx`, a saved Telnyx connection, and an approved live sender on a number from a real Telnyx account (its approval is read from the account by the number sync). Without them the composer stays paused, so a local setup never sends a real message. See [Messaging](architecture.md#messaging-m3) and [Running on a live Telnyx account](live-telnyx.md).
 
 ## Simulating webhooks
 

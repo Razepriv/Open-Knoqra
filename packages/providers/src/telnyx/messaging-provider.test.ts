@@ -152,7 +152,152 @@ describe('TelnyxMessagingProvider.sendWhatsApp', () => {
   it('refuses a send with neither a body nor a template, without calling Telnyx', async () => {
     const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
     await expect(provider(fetchImpl).sendWhatsApp({ ...sms })).rejects.toThrow(
-      'WhatsApp send needs a body or a template',
+      'WhatsApp send needs a body, a file or a template',
+    );
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('TelnyxMessagingProvider WhatsApp media, replies and reactions', () => {
+  const LINK = 'https://api.example.test/api/media/ma_1?o=org_1&e=1&s=sig';
+
+  it('sends an image by link with the body as its caption', async () => {
+    const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
+    await provider(fetchImpl).sendWhatsApp({
+      ...sms,
+      body: 'The new part',
+      media: { kind: 'image', link: LINK },
+    });
+    expect(calls[0]?.url).toBe(`${BASE}/messages/whatsapp`);
+    expect(calls[0]?.body).toEqual({
+      from: OUR,
+      to: CONTACT,
+      whatsapp_message: { type: 'image', image: { link: LINK, caption: 'The new part' } },
+    });
+  });
+
+  it('sends a voice note as audio with voice: true and never a caption', async () => {
+    const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
+    await provider(fetchImpl).sendWhatsApp({
+      ...sms,
+      body: 'ignored',
+      media: { kind: 'voice', link: LINK },
+    });
+    expect(calls[0]?.body).toMatchObject({
+      whatsapp_message: { type: 'audio', audio: { link: LINK, voice: true } },
+    });
+    expect(JSON.stringify(calls[0]?.body)).not.toContain('caption');
+  });
+
+  it('sends a document with its file name', async () => {
+    const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
+    await provider(fetchImpl).sendWhatsApp({
+      ...sms,
+      media: { kind: 'document', link: LINK, fileName: 'quote.pdf' },
+    });
+    expect(calls[0]?.body).toMatchObject({
+      whatsapp_message: { type: 'document', document: { link: LINK, filename: 'quote.pdf' } },
+    });
+  });
+
+  it('cuts a caption to 1024 bytes without splitting a character', async () => {
+    const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
+    await provider(fetchImpl).sendWhatsApp({
+      ...sms,
+      body: 'é'.repeat(600),
+      media: { kind: 'video', link: LINK },
+    });
+    const sent = calls[0]?.body as { whatsapp_message: { video: { caption: string } } };
+    const caption = sent.whatsapp_message.video.caption;
+    expect(new TextEncoder().encode(caption).length).toBe(1024);
+  });
+
+  it('quotes the replied-to message by its wamid', async () => {
+    const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
+    await provider(fetchImpl).sendWhatsApp({ ...sms, body: 'Yes', replyTo: 'wamid.ABC' });
+    expect(calls[0]?.body).toMatchObject({
+      whatsapp_message: {
+        type: 'text',
+        text: { body: 'Yes' },
+        context: { message_id: 'wamid.ABC' },
+      },
+    });
+  });
+
+  it('sends a reaction to a wamid', async () => {
+    const { calls, fetchImpl } = stubFetch(json(200, fixture('send-whatsapp-response')));
+    const sent = await provider(fetchImpl).sendWhatsAppReaction({
+      ...sms,
+      targetChannelMessageId: 'wamid.ABC',
+      emoji: '👍',
+    });
+    expect(sent.providerMessageId).toBeTruthy();
+    expect(calls[0]?.headers.get('idempotency-key')).toBe(IDEMPOTENCY_KEY);
+    expect(calls[0]?.body).toEqual({
+      from: OUR,
+      to: CONTACT,
+      whatsapp_message: { type: 'reaction', reaction: { message_id: 'wamid.ABC', emoji: '👍' } },
+    });
+  });
+});
+
+describe('TelnyxMessagingProvider.fetchWhatsAppMedia', () => {
+  const bytes = () =>
+    new Response(new Uint8Array([1, 2, 3]), {
+      status: 200,
+      headers: { 'content-type': 'image/jpeg', 'content-length': '3' },
+    });
+
+  it('downloads a hosted URL with the bearer key', async () => {
+    const { calls, fetchImpl } = stubFetch(bytes);
+    const media = await provider(fetchImpl).fetchWhatsAppMedia({
+      businessNumber: OUR,
+      url: 'https://media.example.test/x',
+      maxBytes: 100,
+    });
+    expect(calls[0]?.url).toBe('https://media.example.test/x');
+    expect(calls[0]?.headers.get('authorization')).toBe(`Bearer ${API_KEY}`);
+    expect(media.contentType).toBe('image/jpeg');
+    expect(media.size).toBe(3);
+    expect(new Uint8Array(await new Response(media.body).arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3]),
+    );
+  });
+
+  it('downloads by media id from /whatsapp/media/{number}/{id} when there is no URL', async () => {
+    const { calls, fetchImpl } = stubFetch(bytes);
+    await provider(fetchImpl).fetchWhatsAppMedia({
+      businessNumber: OUR,
+      mediaId: '1330663939258924',
+      maxBytes: 100,
+    });
+    expect(calls[0]?.url).toBe(`${BASE}/whatsapp/media/%2B12025550100/1330663939258924`);
+  });
+
+  it('refuses a file larger than the limit', async () => {
+    const { fetchImpl } = stubFetch(bytes);
+    const error = await thrown(
+      provider(fetchImpl).fetchWhatsAppMedia({ businessNumber: OUR, mediaId: 'm', maxBytes: 2 }),
+    );
+    expect(error.code).toBe('media_too_large');
+  });
+
+  it('maps a 404 (expired media id) to an error with the status', async () => {
+    const { fetchImpl } = stubFetch(json(404, { errors: [{ code: '10005' }] }));
+    const error = await thrown(
+      provider(fetchImpl).fetchWhatsAppMedia({ businessNumber: OUR, mediaId: 'm', maxBytes: 9 }),
+    );
+    expect(error.status).toBe(404);
+  });
+
+  it('refuses a non-https URL without fetching it', async () => {
+    const { calls, fetchImpl } = stubFetch(bytes);
+    await thrown(
+      provider(fetchImpl).fetchWhatsAppMedia({
+        businessNumber: OUR,
+        url: 'http://media.example.test/x',
+        maxBytes: 9,
+      }),
     );
     expect(calls).toHaveLength(0);
   });
@@ -174,7 +319,7 @@ describe('TelnyxMessagingProvider errors', () => {
     expect(error.code).toBe('10009');
     expect(error.failure).toEqual({
       code: 'provider_auth',
-      message: 'Telnyx rejected the API key.',
+      message: 'Your phone provider rejected the saved API key.',
       retryable: false,
     });
   });
@@ -283,7 +428,7 @@ describe('classifyTelnyxError', () => {
     for (const status of [401, 403]) {
       expect(classifyTelnyxError(status, '10009')).toEqual({
         code: 'provider_auth',
-        message: 'Telnyx rejected the API key.',
+        message: 'Your phone provider rejected the saved API key.',
         retryable: false,
       });
     }

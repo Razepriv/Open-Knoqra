@@ -10,4 +10,6 @@ export * from './telnyx';
 export * from './telnyx/messaging-errors';
 export * from './telnyx/messaging-normalize';
 export * from './telnyx/messaging-provider';
+export * from './telnyx/ten-dlc';
+export * from './telnyx/whatsapp-accounts';
 export * from './types';

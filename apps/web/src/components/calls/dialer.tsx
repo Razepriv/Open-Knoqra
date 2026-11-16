@@ -78,6 +78,7 @@ export function Dialer({ initialContactId, initialTo }: DialerProps) {
   const inCall = session.current !== null && isLiveState(session.current.state);
   const decision = check.kind === 'ready' ? check.preflight.decision : null;
   const canCall =
+    !emergency &&
     check.kind === 'ready' &&
     decision !== null &&
     decision.outcome !== 'blocked' &&

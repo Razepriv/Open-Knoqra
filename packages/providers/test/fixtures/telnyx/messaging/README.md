@@ -60,3 +60,20 @@ and the code compares each returned `phone_number` (documented as +E.164) to the
 | `error-401-auth.json` (reused) | The same error body shape applies to this endpoint's 401 response on the page above |
 
 Docs read on 2026-11-13.
+
+## WhatsApp inbound media, reactions and replies (messaging upgrade, docs read on 2026-11-16)
+
+These follow the **live** inbound WhatsApp shape seen on 2026-11-16 (`payload.to` is a plain E.164
+string, text at `payload.body.text.body`, `payload.body.type` names the content) plus the fields
+Telnyx's guides document for it. The guides do not show every type, so the per-type fields are
+Meta's own (Telnyx passes `payload.body` through). Built, not recorded.
+
+| Fixture | Source |
+| --- | --- |
+| `webhook-whatsapp-image-received.json` | `body.image` with a Telnyx-hosted `url`, `mime_type`, `sha256`: "Downloading Inbound Media" in https://developers.telnyx.com/docs/messaging/whatsapp/send-messages; `body.foreign_id` is the wamid per the `MessagingInboundMessagePayload` schema; `caption` per Meta's image webhook reference |
+| `webhook-whatsapp-voice-received.json` | The guide's fallback case: a Meta media `id` and no `url` (downloaded with `GET /v2/whatsapp/media/{phone_number}/{id}`); `voice: true` and `audio/ogg; codecs=opus` per Meta's audio webhook reference |
+| `webhook-whatsapp-document-received.json` | `body.document` with `filename` and `caption` per Meta's document webhook reference |
+| `webhook-whatsapp-video-received.json` | `body.video`, same pattern as the image |
+| `webhook-whatsapp-sticker-received.json` | `body.sticker` with `animated` per Meta's sticker webhook reference |
+| `webhook-whatsapp-reaction-received.json` | `type: "reaction"`, `reaction: { message_id, emoji }` per Meta's reaction webhook reference (Telnyx does not document inbound reactions) |
+| `webhook-whatsapp-reply-received.json` | `context: { from, id }` per Meta's contextual-replies reference (Telnyx does not document inbound context) |

@@ -24,7 +24,7 @@ test.afterEach(async ({ page }) => {
 });
 
 async function syncAndAssign(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Sync from Telnyx' }).click();
+  await page.getByRole('button', { name: 'Sync numbers' }).click();
   await expect(page.getByRole('radio')).toHaveCount(3, PIPELINE);
   await page.getByRole('radio', { name: /\+1 202 555 0100/ }).check();
   await page.getByRole('button', { name: 'Use for calls and messages' }).click();
