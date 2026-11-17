@@ -259,6 +259,16 @@ export function CallSessionProvider({
     }
   }, [current]);
 
+  // The server cut the call for lack of credit (it also hung up the provider leg): drop this
+  // browser's line too, so the audio stops even if the provider's hangup has not reached it yet.
+  const cutLines = useRef(new Set<string>());
+  useEffect(() => {
+    if (current?.hangupCause !== 'cut_off' || isLiveState(current.state)) return;
+    if (lineEndedAt !== null || cutLines.current.has(current.id)) return;
+    cutLines.current.add(current.id);
+    void held.current?.client.hangup(current.id).catch(() => undefined);
+  }, [current, lineEndedAt]);
+
   // When the call ends without an outcome, ask for one, once.
   useEffect(() => {
     if (!current || isLiveState(current.state) || current.outcome !== null) return;

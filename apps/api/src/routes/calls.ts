@@ -52,7 +52,7 @@ import {
   resolveTarget,
   warningsOf,
 } from '../services/calls';
-import { callSettleKey, settleReservation, walletSummary } from '../services/ledger';
+import { settleCallHolds, walletSummary } from '../services/ledger';
 import { providerSpendDecision } from '../services/provider-spend';
 import {
   activeRoute,
@@ -399,13 +399,11 @@ export const calls = new OpenAPIHono<AppEnv>()
         stateAfter: next,
       });
       if (row.reservationId) {
-        await settleReservation(tx, {
+        await settleCallHolds(tx, {
           orgId: tenant.orgId,
+          callId: id,
           reservationId: row.reservationId,
           costMicros: 0,
-          idempotencyKey: callSettleKey(id),
-          refType: 'call',
-          refId: id,
         });
       }
       await insertCallAudit(tx, tenant, {

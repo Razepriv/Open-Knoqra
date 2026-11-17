@@ -131,6 +131,28 @@ describe('PlivoProvider calls', () => {
     });
   });
 
+  it('passes the call time limit to Plivo, clamped to its range', async () => {
+    const { calls, fetchImpl } = stubFetch(
+      [900, 0, 100_000].map(() => ({
+        method: 'POST',
+        url: `${ACCOUNT}/Call/`,
+        respond: json(201, fixtureText('call-created')),
+      })),
+    );
+    for (const timeLimitSecs of [900, 0, 100_000]) {
+      await provider(fetchImpl, { answerUrl: 'https://api.example/answer' }).createCall({
+        orgId: 'org_1',
+        from: '+12025550110',
+        to: '+12025550123',
+        idempotencyKey: 'abc',
+        timeLimitSecs,
+      });
+    }
+    expect(calls.map((c) => (c.body as { time_limit?: number }).time_limit)).toEqual([
+      900, 1, 86_400,
+    ]);
+  });
+
   it('refuses a server call without an answer URL', async () => {
     const { fetchImpl } = stubFetch([]);
     await expect(

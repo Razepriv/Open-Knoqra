@@ -12,10 +12,9 @@ import { type CallJson, callJsonById } from '../lib/call-json';
 import { logger } from '../lib/logger';
 import { type CallBilling, NO_PLATFORM_FEE } from '../lib/pricing';
 import {
-  callSettleKey,
   chargePlatformFee,
   ensureWallet,
-  settleReservation,
+  settleCallHolds,
   type WalletSummary,
   walletSummary,
 } from '../services/ledger';
@@ -298,9 +297,9 @@ function endingOf(base: CallRow, event: NormalizedCallEvent, endedAt: Date) {
 }
 
 /**
- * Settles the call's hold once (callSettleKey). If the reservation was already closed another
- * way, the ledger returns that close unchanged; the mismatch is logged (ids and kinds only) and
- * processing continues.
+ * Settles the call's holds once: the first with the whole cost (callSettleKey), any added mid-call
+ * released. If the reservation was already closed another way, the ledger returns that close
+ * unchanged; the mismatch is logged (ids and kinds only) and processing continues.
  */
 async function settle(
   tx: Tx,
@@ -308,13 +307,11 @@ async function settle(
   reservationId: string,
   costMicros: number,
 ): Promise<void> {
-  const entry = await settleReservation(tx, {
+  const entry = await settleCallHolds(tx, {
     orgId: row.organizationId,
+    callId: row.id,
     reservationId,
     costMicros,
-    idempotencyKey: callSettleKey(row.id),
-    refType: 'call',
-    refId: row.id,
   });
   const expectedKind = costMicros === 0 ? 'release' : 'capture';
   const sameAmount = expectedKind === 'release' || entry.balanceDeltaMicros === -costMicros;

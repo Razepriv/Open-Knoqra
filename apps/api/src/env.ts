@@ -2,6 +2,7 @@
 import type { OrgRealtime } from './do/org-realtime';
 import type { UserCallLock } from './do/user-call-lock';
 import type { ApiExtension } from './extensions';
+import type { QueueMessage } from './queue/messages';
 
 export type AppEnvironment = 'development' | 'test' | 'staging' | 'production';
 
@@ -96,7 +97,8 @@ export interface Env {
   POSTHOG_KEY?: string;
   /** PostHog ingestion host (https). Default `https://us.i.posthog.com`. */
   POSTHOG_HOST?: string;
-  PROVIDER_EVENTS: Queue<{ rawEventId: string }>;
+  /** Stored provider events to apply, and delayed mid-call meter steps (queue/messages.ts). */
+  PROVIDER_EVENTS: Queue<QueueMessage>;
   /** One realtime fan-out object per organization, keyed `idFromName(orgId)`. */
   ORG_REALTIME: DurableObjectNamespace<OrgRealtime>;
   /** One active-call lock per user, keyed `idFromName(userId)`. */

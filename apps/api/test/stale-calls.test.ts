@@ -61,7 +61,12 @@ async function dial(u: User): Promise<string> {
 
 function backdate(
   callId: string,
-  set: { state?: 'connected' | 'ringing'; answeredAt?: Date; updatedAt: Date },
+  set: {
+    state?: 'connected' | 'ringing';
+    answeredAt?: Date;
+    updatedAt: Date;
+    paidMinutes?: number;
+  },
 ) {
   return withAdminDb((db) => db.update(call).set(set).where(eq(call.id, callId)));
 }
@@ -104,7 +109,7 @@ describe('stale-call sweep', () => {
     await backdate(callId, { state: 'ringing', updatedAt: new Date(now.getTime() - 11 * MINUTE) });
 
     const swept = await sweepStaleCalls(workerEnv, { now, orgIds: [u.orgId] });
-    expect(swept).toEqual({ swept: 1, failed: 0 });
+    expect(swept).toEqual({ swept: 1, failed: 0, metered: 0 });
 
     expect(await callRow(callId)).toMatchObject({
       state: 'failed',
@@ -126,6 +131,7 @@ describe('stale-call sweep', () => {
     expect(await sweepStaleCalls(workerEnv, { now, orgIds: [u.orgId] })).toEqual({
       swept: 0,
       failed: 0,
+      metered: 0,
     });
     expect(await settlementsOf(u.orgId, callId)).toHaveLength(1);
   });
@@ -144,6 +150,7 @@ describe('stale-call sweep', () => {
     expect(await sweepStaleCalls(workerEnv, { now, orgIds: [u.orgId] })).toEqual({
       swept: 1,
       failed: 0,
+      metered: 0,
     });
 
     // Capped at CALL_RESERVE_MINUTES (10) minutes: 600 s at the core's flat rate ($0.01) a minute.
@@ -159,12 +166,14 @@ describe('stale-call sweep', () => {
   });
 
   it('leaves fresh calls alone: a new pre-connect call and a connected call idle for 1 hour', async () => {
+    // The connected call's holds cover 70 minutes, so the mid-call meter leaves it alone too.
     const u = await newUser('sweep-fresh');
     const fresh = await dial(u);
     const now = new Date();
     expect(await sweepStaleCalls(workerEnv, { now, orgIds: [u.orgId] })).toEqual({
       swept: 0,
       failed: 0,
+      metered: 0,
     });
     const before = await callRow(fresh);
     expect(before?.endedAt).toBeNull();
@@ -172,10 +181,16 @@ describe('stale-call sweep', () => {
     expect(await lockHolder(u.userId)).toBe(fresh);
 
     const hourAgo = new Date(now.getTime() - HOUR);
-    await backdate(fresh, { state: 'connected', answeredAt: hourAgo, updatedAt: hourAgo });
+    await backdate(fresh, {
+      state: 'connected',
+      answeredAt: hourAgo,
+      updatedAt: hourAgo,
+      paidMinutes: 70,
+    });
     expect(await sweepStaleCalls(workerEnv, { now, orgIds: [u.orgId] })).toEqual({
       swept: 0,
       failed: 0,
+      metered: 0,
     });
     expect((await callRow(fresh))?.state).toBe('connected');
   });

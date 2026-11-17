@@ -4,8 +4,11 @@ import {
   callErrorCopy,
   callStateRank,
   canLogOutcome,
+  cutOffEndedCopy,
+  cutOffWarningCopy,
   formatDuration,
   recentStateCopy,
+  secondsUntilCutOff,
   spendNoteCopy,
   unreadCount,
 } from './calls';
@@ -129,6 +132,8 @@ describe('recentStateCopy', () => {
     outcome: null,
     outcomeNote: null,
     reviewConfirmed: false,
+    paidUntil: null,
+    cutOff: null,
     ...over,
   });
 
@@ -205,5 +210,43 @@ describe('spendNoteCopy', () => {
     expect(spendNoteCopy('stop', 'provider_exhausted')).toBe(
       'Your phone provider balance is too low to place a call. Top it up with your provider.',
     );
+  });
+});
+
+describe('cut-off copy', () => {
+  const live = {
+    state: 'connected' as const,
+    hangupCause: null,
+    cutOff: { reason: 'insufficient_funds' as const, at: '2026-11-17T10:09:50.000Z' },
+  };
+
+  it('counts down to the cut-off of a live call, never below zero', () => {
+    expect(secondsUntilCutOff(live, new Date('2026-11-17T10:09:00.000Z'))).toBe(50);
+    expect(secondsUntilCutOff(live, new Date('2026-11-17T10:09:49.400Z'))).toBe(1);
+    expect(secondsUntilCutOff(live, new Date('2026-11-17T10:10:30.000Z'))).toBe(0);
+    expect(secondsUntilCutOff({ ...live, cutOff: null }, new Date())).toBeNull();
+    expect(secondsUntilCutOff({ ...live, state: 'completed' }, new Date())).toBeNull();
+  });
+
+  it('says why an ended call was cut, and nothing for other calls', () => {
+    expect(cutOffEndedCopy({ ...live, state: 'completed', hangupCause: 'cut_off' })).toBe(
+      'Call ended: out of credit',
+    );
+    expect(
+      cutOffEndedCopy({
+        state: 'completed',
+        hangupCause: 'cut_off',
+        cutOff: { reason: 'stop_cap', at: live.cutOff.at },
+      }),
+    ).toBe('Call ended: monthly spend cap reached');
+    expect(cutOffEndedCopy({ ...live, state: 'completed', hangupCause: 'normal' })).toBeNull();
+    expect(cutOffEndedCopy(live)).toBeNull();
+  });
+
+  it('has a warning for every reason, with no numbers in it', () => {
+    for (const reason of ['insufficient_funds', 'stop_cap', 'paid_time_over'] as const) {
+      expect(cutOffWarningCopy(reason)).toMatch(/end soon/);
+      expect(cutOffWarningCopy(reason)).not.toMatch(/\d/);
+    }
   });
 });

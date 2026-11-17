@@ -9215,7 +9215,16 @@ export interface components {
             outcome: "connected" | "rescheduled" | "follow_up" | "voicemail" | "no_answer" | "wrong_number" | null;
             outcomeNote: string | null;
             reviewConfirmed: boolean;
+            /** Format: date-time */
+            paidUntil: string | null;
+            cutOff: components["schemas"]["CallCutOff"];
         };
+        CallCutOff: {
+            /** @enum {string} */
+            reason: "insufficient_funds" | "stop_cap" | "paid_time_over";
+            /** Format: date-time */
+            at: string;
+        } | null;
         CallDial: {
             /** @enum {string} */
             provider: "fake" | "telnyx" | "plivo";

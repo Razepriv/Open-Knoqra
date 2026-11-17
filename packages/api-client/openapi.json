@@ -3818,6 +3818,13 @@
           },
           "reviewConfirmed": {
             "type": "boolean"
+          },
+          "paidUntil": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "cutOff": {
+            "$ref": "#/components/schemas/CallCutOff"
           }
         },
         "required": [
@@ -3836,8 +3843,24 @@
           "hangupCause",
           "outcome",
           "outcomeNote",
-          "reviewConfirmed"
+          "reviewConfirmed",
+          "paidUntil",
+          "cutOff"
         ]
+      },
+      "CallCutOff": {
+        "type": ["object", "null"],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": ["insufficient_funds", "stop_cap", "paid_time_over"]
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["reason", "at"]
       },
       "CallDial": {
         "type": "object",

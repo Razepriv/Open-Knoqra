@@ -4,6 +4,7 @@ import {
   bigint,
   check,
   foreignKey,
+  index,
   pgTable,
   text,
   timestamp,
@@ -83,6 +84,10 @@ export const ledgerEntry = pgTable(
     uniqueIndex('ledger_entry_reservation_close_unique')
       .on(table.reservationId)
       .where(sql`${table.kind} in ('capture', 'release')`),
+    // A call's holds (the one at the start and any added mid-call), so its end can close them all.
+    index('ledger_entry_call_hold_idx')
+      .on(table.organizationId, table.refId)
+      .where(sql`${table.kind} = 'reserve' and ${table.refType} = 'call'`),
     foreignKey({
       name: 'ledger_entry_wallet_fk',
       columns: [table.organizationId, table.walletId],

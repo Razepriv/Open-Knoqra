@@ -2,12 +2,13 @@ import { Avatar, Button, Panel } from '@knoqra/ui';
 import { Grid3x3, Mic, MicOff, PhoneOff } from 'lucide-react';
 import { type CSSProperties, useState } from 'react';
 import { deskSlot } from '../../extensions';
-import { type Call, formatDuration, outcomeLabel } from '../../lib/calls';
+import { type Call, cutOffEndedCopy, formatDuration, outcomeLabel } from '../../lib/calls';
 import { formatPhone, gradientFor } from '../../lib/contacts';
 import { callStateDot, callStateLine, elapsedSeconds, isLiveState } from '../../lib/dial';
 import { focusRing } from '../../lib/ui-classes';
 import { useNow } from '../../lib/use-now';
 import { useCallSession } from './call-session';
+import { CutOffWarning } from './cut-off-notice';
 import { Keypad } from './keypad';
 
 const mono = 'font-[family-name:var(--font-mono)] font-medium';
@@ -63,7 +64,8 @@ const roundButton = `flex size-[62px] cursor-pointer items-center justify-center
 
 /**
  * The middle panel during a call: who, the state line (a polite live region), a mono timer from
- * `answeredAt`, and Mute, Keypad (DTMF) and Hang up. Once the call ends it shows how it ended.
+ * `answeredAt`, a warning with a countdown when the wallet or the spend cap cannot pay for more
+ * minutes, and Mute, Keypad (DTMF) and Hang up. Once the call ends it shows how it ended.
  */
 export function LiveCallPanel({ call }: { call: Call }) {
   const session = useCallSession();
@@ -116,10 +118,13 @@ export function LiveCallPanel({ call }: { call: Call }) {
       />
       {live && LiveCallAudio ? <LiveCallAudio call={call} /> : null}
       <p role="status" aria-live="polite" className="font-medium text-[15px] leading-[1.3]">
-        {endedHere === null ? callStateLine(call.state, call.direction) : 'Call ended'}
+        {endedHere === null
+          ? (cutOffEndedCopy(call) ?? callStateLine(call.state, call.direction))
+          : 'Call ended'}
       </p>
       {live ? (
         <>
+          <CutOffWarning call={call} />
           <div className="mt-1 flex justify-center gap-[14px]">
             <button
               type="button"

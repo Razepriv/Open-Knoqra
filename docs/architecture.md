@@ -456,9 +456,10 @@ Browser                     API Worker                          Provider
 3. **Ingest.** See [Webhook ingest contract](#webhook-ingest-contract). Nothing is applied in the request.
 4. **Route.** A call resolves by `call_route.client_state`, then by the bound provider call id. Only a *new inbound* call resolves by organization: the fake provider's `orgHint` (honored outside production only), otherwise the dialed number in `provider_number_route`. An unroutable event is parked as `unknown_call`.
 5. **Apply.** Everything happens in one `withTenant` transaction with the call row locked. The `call_event` insert on `(call_id, raw_event_id)` is the idempotency gate: a conflict means the raw event was already applied and nothing else changes. The first provider call id seen is bound to the call; a different id later parks the event as `call_id_mismatch`.
-6. **Settle.** On the first terminal transition the hold is closed with the single key `call:<id>:settle`, so the app-side cancel and the event pipeline can race and the call is still settled once. Billable seconds run from `answered_at` to `ended_at`, rounded up, unless the provider reports its own figure for an answered call. A hangup that reports billed seconds for a call not yet connected implies the answer (`answered_inferred`). A call that never connected bills zero, which releases the hold.
+6. **Settle.** On the first terminal transition every hold of the call is closed once: the first with the whole cost under the single key `call:<id>:settle`, and each hold added mid-call ([Mid-call metering](#mid-call-metering-and-cut-off)) released under its own key. So the app-side cancel, the event pipeline and the cut-off can race and the call is still settled once. Billable seconds run from `answered_at` to `ended_at`, rounded up, unless the provider reports its own figure for an answered call. A hangup that reports billed seconds for a call not yet connected implies the answer (`answered_inferred`). A call that never connected bills zero, which releases the hold.
 7. **Fan out.** The lock release and the realtime frames run after the commit and never roll it back. A failure there is logged, not retried, because the lock has a TTL and realtime is only a notification channel.
-8. **Sweep.** A call whose events stopped arriving is ended by the [stale-call sweep](#stale-call-sweep) through this same apply path.
+8. **Meter.** When a call that holds minutes is answered, the first mid-call extension is queued for a minute before its first 10 minutes run out ([Mid-call metering and cut-off](#mid-call-metering-and-cut-off)).
+9. **Sweep.** A call whose events stopped arriving is ended by the [stale-call sweep](#stale-call-sweep) through this same apply path.
 
 Outcomes (`connected`, `rescheduled`, `follow_up`, `voicemail`, `no_answer`, `wrong_number`) are recorded once per ended call with `POST /api/v1/calls/{id}/outcome` and written to the contact's timeline.
 
@@ -491,8 +492,24 @@ A lost webhook or a browser closed mid-dial would leave a call "live": its hold 
 1. **Find organizations** with a `call_route` row created in the last two days (a system table, read without tenant context).
 2. **Find stale calls** in each, inside `withTenant`: a call in `queued`, `initiating` or `ringing` whose `updated_at` is more than 10 minutes old, or a call in `connected` or `ending` whose `updated_at` is more than 4 hours old.
 3. **End each one** in its own transaction, with the call row locked and the staleness re-checked under the lock (an event may have arrived since the scan). The sweep feeds a synthetic `hangup` with cause `failed` through the same apply path as a provider event, so state, `call_event`, settlement, timeline and the after-commit fan-out match. The `call_event` row has signal `swept` and raw event id `sweep:<callId>:<epoch ms>`; no `provider_event_raw` row is written.
-4. **Bill** from `answered_at` to the sweep time, capped at `CALL_RESERVE_MINUTES` (600 seconds). A call that never connected bills zero, which releases the hold.
+4. **Bill** from `answered_at` to the sweep time, capped at the minutes the call's holds cover (`call.paid_minutes`, 10 for a call from before mid-call metering). A call that never connected bills zero, which releases the hold.
 5. **After commit**, release the user's call lock and publish `call.updated` (and `wallet.updated`), exactly as for a provider hangup. A failure on one call is logged (`call.sweep_failed`) and the sweep moves on.
+6. **Then the meter backstop** runs for the organization's calls that are still live (see below).
+
+### Mid-call metering and cut-off
+
+A call starts with 10 minutes held. Without more, a long call would push a prepaid wallet below zero or past the monthly stop cap, and on KNOQRA Cloud's own Telnyx account the provider bill would land on KNOQRA. So the server extends the hold while the call runs and ends the call when nothing more can be held (`events/call-meter.ts`, pure rules in `@knoqra/core` `call-meter.ts`).
+
+1. **Paid minutes.** `call.paid_minutes` counts the billed minutes the call's holds cover from the answer: 10 when `POST /calls` or the inbound answer reserves, more with each extension. The call JSON exposes `paidUntil` (the answer plus the paid minutes).
+2. **Extension.** When a call is answered, a meter step is sent to the provider-events queue with `delaySeconds`, due a minute before the paid time runs out (`CALL_EXTEND_LEAD_SECONDS`). The step locks the call row, then the wallet (the order settlement uses), and holds up to another 10 minutes: as many whole minutes as `evaluateSpend` allows against the wallet and the monthly stop cap (a warn cap never cuts a call). The hold is a `reserve` with `ref_type` `call` and the key `call:<id>:extend:<paid minutes before>`, so a block is held at most once. It queues the next step and publishes `call.updated` and `wallet.updated`.
+3. **Warning.** When not one more minute fits, the call gets `cutoff_reason` (`insufficient_funds` or `stop_cap`) and `cutoff_at`, 10 seconds before the paid time runs out (`CALL_CUTOFF_MARGIN_SECONDS`). `call.updated` carries them as `cutOff`, and the Desk (live panel and dock) and the mobile app show the reason with a countdown. A `cutoff` step is queued for `cutoff_at`.
+4. **Cut-off.** The `cutoff` step tries the extension once more, so credit added during the warning keeps the call going (the warning clears). Otherwise it hangs the call up at the provider with the workspace's own key (a managed workspace's is the platform key sealed for it; Telnyx 422 `90018` or a 404 means already ended; other 4xx are logged and reported; network, 5xx, 408 and 429 throw so the queue retries). Then, in one tenant transaction, it ends the call through the shared apply path with a synthetic hangup billed from the answer to now, never past the paid minutes; the `call_event` row (signal and raw event id `cut_off:<call id>`) is the gate that makes this happen once. The hangup cause becomes `cut_off`, an audit row `call.cut_off` (outcome `denied`, actor none, ids and enums only) is written, and every owner gets a `system` notification (dedupe `call_cut_off:<call id>`), as the emergency call guard reports blocked calls. The after-commit fan-out releases the call lock and publishes the call and wallet; the Desk and the mobile app also drop their own line.
+5. **Settlement.** Every hold is closed once (see step 6 of the voice pipeline): the first hold's capture carries the whole cost and may exceed that hold, each extension is released. The balance moves by the cost alone and never below zero for a metered call.
+6. **Backstop.** After the stale-call sweep, every five minutes, `meterLiveCalls` checks each live call of the organization: one within six minutes of its paid time is extended now, one whose cut-off is more than a minute late is cut, and one that has run more than a minute past its paid minutes with no hold added is cut without extending (`cutoff_reason` `paid_time_over`), because a call whose hangup event was lost would otherwise be extended forever. Steps already done by the queue make these no-ops. A meter step that exhausts its retries is logged and reported by the dead-letter handler, which leaves the call to the backstop.
+
+**Why the queue and not a Durable Object alarm.** Delayed queue messages are durable, retried and dead-lettered like provider events, and need no new binding, class or migration. The Worker's queue handler gets the edition's extensions, so an extension is priced like the call (KNOQRA Cloud's per-destination price and platform fee); Durable Object classes are exported without them. A per-call alarm would be more precise, but the step runs a minute ahead, so a few seconds of queue delay do not matter. Cron alone runs at most once a minute, too coarse for a one-minute warning; it is the backstop instead.
+
+**Provider time limit.** Telnyx accepts `time_limit_secs` only when a leg is created (Dial and Transfer), and Plivo `time_limit` only on its Call API. `createCall` sends either when given `timeLimitSecs`. The browser and the mobile app dial their legs with the WebRTC SDK, which cannot carry a limit, so for those calls the backstop above and the provider account's own daily spend limit are the last lines.
 
 ## Ledger model
 
@@ -521,7 +538,7 @@ Invariants, enforced by the database and the service together:
 - **Idempotency.** `(organization_id, idempotency_key)` is unique. Replaying a reserve, settle or credit returns the first entry; reusing a key for a different entry is an `idempotency_conflict`.
 - **Serialized per org.** Every reserve, settlement and credit takes the wallet row `FOR UPDATE`, so the spend check and the insert see one consistent balance.
 - **Held never goes negative.** `assertLedgerInvariants` (`packages/core`) checks this, plus the rules above, over any list of lines in tests.
-- **Capture may exceed the hold.** A call that outlasts the 10-minute reserve is charged in full and the balance can go below zero. Topping up holds mid-call is M6.
+- **Capture may exceed the hold.** A call's first hold is captured with the call's whole cost, and the holds added mid-call are released, so held drops by everything the call held and the balance by the cost. A call is extended only while the wallet covers it, and ended when it can't ([Mid-call metering](#mid-call-metering-and-cut-off)), so a metered call never takes the balance below zero. The partial index `ledger_entry_call_hold_idx` finds a call's holds.
 
 **Spend caps** are calendar-month (UTC) caps on `wallet` (`warn_cap_micros` and `stop_cap_micros`, nullable = off, warn must not exceed stop). `evaluateSpend` computes projected spend = captured this month + currently held + the new request, then decides in order:
 
@@ -543,7 +560,7 @@ Both classes are SQLite-backed (migration tag `v1` in `wrangler.jsonc`, declared
 
 `GET /api/v1/realtime` upgrades the connection. A guard registered before the session chain rejects non-upgrade requests with 426 and any `Origin` other than the web origin with 403 (the CSRF defence for WebSockets). The tenant middleware then authenticates and re-checks membership, and the route hands the socket to the organization's object, tagged with the user id.
 
-Frames are `{ "type": "call.updated" | "wallet.updated" | "voicemail.created", "data": ... }`. Messaging publishes no frames yet; the Inbox polls. Realtime is best effort and never the source of truth: a publish failure is logged with the org id and swallowed.
+Frames are `{ "type": "call.updated" | "wallet.updated" | "voicemail.created", "data": ... }`. A `call.updated` frame carries the call's `paidUntil` and, when no more minutes can be held, its planned `cutOff`. Messaging publishes no frames yet; the Inbox polls. Realtime is best effort and never the source of truth: a publish failure is logged with the org id and swallowed.
 
 ## Credential vault
 
@@ -658,7 +675,7 @@ Statuses: `matched` (zero drift), `adjusted` (drift up to $50, `RECONCILE_MAX_AU
 
 | Job | Cron (UTC) | Does |
 | --- | --- | --- |
-| `stale-call-sweep` | `*/5 * * * *` | Ends calls whose provider events stopped arriving (see [Stale-call sweep](#stale-call-sweep)) |
+| `stale-call-sweep` | `*/5 * * * *` | Ends calls whose provider events stopped arriving (see [Stale-call sweep](#stale-call-sweep)), then runs the mid-call meter's backstop |
 | `balance-poll` | `*/30 * * * *` | Polls every organization's provider balance and completes pending number orders |
 | `ledger-reconcile` | `15 3 * * *` | Reconciles the previous UTC day |
 

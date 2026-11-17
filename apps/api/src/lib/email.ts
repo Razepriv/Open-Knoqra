@@ -9,6 +9,14 @@ export interface EmailMessage {
   html?: string;
   /** Extra headers, such as List-Unsubscribe. */
   headers?: Record<string, string>;
+  /** Files to attach, such as an invoice PDF. `content` is base64. */
+  attachments?: EmailAttachment[];
+}
+
+export interface EmailAttachment {
+  filename: string;
+  /** The file's bytes, base64 encoded. */
+  content: string;
 }
 
 export interface EmailSender {
@@ -62,7 +70,7 @@ export function resendEmailSender(opts: ResendOptions): EmailSender {
   const doFetch = opts.fetch ?? fetch;
   const replyTo = opts.replyTo?.trim();
   return {
-    async send({ to, subject, text, html, headers }) {
+    async send({ to, subject, text, html, headers, attachments }) {
       const response = await doFetch(RESEND_URL, {
         method: 'POST',
         headers: {
@@ -77,6 +85,9 @@ export function resendEmailSender(opts: ResendOptions): EmailSender {
           ...(html ? { html } : {}),
           ...(replyTo ? { reply_to: replyTo } : {}),
           ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+          ...(attachments && attachments.length > 0
+            ? { attachments: attachments.map(({ filename, content }) => ({ filename, content })) }
+            : {}),
         }),
         signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
       });

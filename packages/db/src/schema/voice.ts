@@ -1,4 +1,10 @@
-import { CALL_OUTCOMES, CALL_STATES, newId, TERMINAL_CALL_STATES } from '@knoqra/core';
+import {
+  CALL_CUTOFF_REASONS,
+  CALL_OUTCOMES,
+  CALL_STATES,
+  newId,
+  TERMINAL_CALL_STATES,
+} from '@knoqra/core';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -66,6 +72,18 @@ export const call = pgTable(
     endedAt: timestamp('ended_at', { withTimezone: true }),
     hangupCause: text('hangup_cause'),
     billableSeconds: integer('billable_seconds'),
+    /**
+     * Billed minutes from the answer that the call's holds cover: the 10 held at the start plus
+     * every block held mid-call (services/call-meter.ts). Null while the call holds nothing.
+     */
+    paidMinutes: integer('paid_minutes'),
+    /**
+     * Set when a mid-call extension was refused (no credit, or the monthly stop cap) or the call ran
+     * past its paid minutes: why, and when the call is (or was) ended. Cleared if a later extension
+     * succeeds.
+     */
+    cutoffReason: text('cutoff_reason', { enum: CALL_CUTOFF_REASONS }),
+    cutoffAt: timestamp('cutoff_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -94,6 +112,14 @@ export const call = pgTable(
       sql`${table.outcome} is null or ${table.outcome} in ('connected', 'rescheduled', 'follow_up', 'voicemail', 'no_answer', 'wrong_number')`,
     ),
     check('call_organization_id_not_empty', sql`${table.organizationId} <> ''`),
+    check(
+      'call_paid_minutes_positive',
+      sql`${table.paidMinutes} is null or ${table.paidMinutes} > 0`,
+    ),
+    check(
+      'call_cutoff_reason_check',
+      sql`${table.cutoffReason} is null or ${table.cutoffReason} in ('insufficient_funds', 'stop_cap', 'paid_time_over')`,
+    ),
     index('call_org_created_idx').on(
       table.organizationId,
       table.createdAt.desc().nullsFirst(),

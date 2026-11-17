@@ -13,6 +13,18 @@ export interface AuthorizedCallRequest {
   from: string;
   to: string;
   idempotencyKey: string;
+  /**
+   * The longest the provider may keep the call up, in seconds: what the wallet can pay for when the
+   * call is placed. Telnyx takes 30 to 14,400 (`time_limit_secs`), Plivo 1 to 86,400 (`time_limit`);
+   * a value outside is clamped. Absent: the provider's default (4 hours on both).
+   */
+  timeLimitSecs?: number;
+}
+
+/** Clamps a requested call time limit to whole seconds within the provider's range. */
+export function clampTimeLimit(seconds: number, min: number, max: number): number {
+  if (!Number.isFinite(seconds)) return max;
+  return Math.min(max, Math.max(min, Math.floor(seconds)));
 }
 export interface ProviderCall {
   providerCallId: string;

@@ -4,7 +4,6 @@ import {
   call,
   callRoute,
   type Database,
-  member,
   notification,
   type ProviderCredentialRow,
   providerEventRaw,
@@ -17,6 +16,7 @@ import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { buildProvider, openConnectionSecret } from '../connectors/registry';
 import type { Env } from '../env';
 import { logger } from '../lib/logger';
+import { workspaceOwnerIds } from '../lib/owners';
 import { isValidMasterKey } from '../lib/secret-envelope';
 import { loadConnection } from '../lib/voice-provider';
 import { reportError } from '../observability/report';
@@ -377,23 +377,15 @@ async function recordBlocked(
         hangup,
       },
     });
-    const owners = await tx
-      .select({ userId: member.userId })
-      .from(member)
-      .where(
-        and(
-          eq(member.organizationId, orgId),
-          sql`'owner' = any(string_to_array(replace(${member.role}, ' ', ''), ','))`,
-        ),
-      );
+    const owners = await workspaceOwnerIds(tx, orgId);
     if (owners.length > 0) {
       const notice = blockedNotice(reason, code);
       await tx
         .insert(notification)
         .values(
-          owners.map((owner) => ({
+          owners.map((userId) => ({
             organizationId: orgId,
-            userId: owner.userId,
+            userId,
             kind: 'system' as const,
             title: notice.title,
             body: notice.body,

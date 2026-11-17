@@ -20,6 +20,7 @@ import type {
   ShortLivedVoiceCredential,
   VoiceProvider,
 } from '../types';
+import { clampTimeLimit } from '../types';
 import { PlivoApiError } from './errors';
 import { CLIENT_STATE_FIELD } from './normalize';
 
@@ -216,6 +217,10 @@ export class PlivoProvider
       answer_method: 'POST',
       sip_headers: `${CLIENT_STATE_FIELD.replace(/^X-PH-/, '')}=${input.idempotencyKey}`,
     };
+    // Plivo hangs the call up itself at this limit.
+    if (input.timeLimitSecs !== undefined) {
+      body.time_limit = clampTimeLimit(input.timeLimitSecs, 1, 86_400);
+    }
     if (this.hangupUrl !== null) {
       body.hangup_url = this.hangupUrl;
       body.hangup_method = 'POST';

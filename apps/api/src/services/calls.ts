@@ -1,5 +1,6 @@
 import type { z } from '@hono/zod-openapi';
 import {
+  CALL_RESERVE_MINUTES,
   type ChannelDecision,
   callHoldMicros,
   callReserveMicros,
@@ -239,6 +240,7 @@ export async function authorizeCall(tx: Tx, input: CreateInput) {
       clientState: newClientState(),
       idempotencyKey: body.idempotencyKey,
       reservationId: reserved.entry.id,
+      paidMinutes: CALL_RESERVE_MINUTES,
       reviewConfirmed,
       priceMicrosPerMinute: quote.priceMicrosPerMinute,
       providerCostMicrosPerMinute: quote.costMicrosPerMinute,
@@ -301,7 +303,11 @@ export async function answerCall(tx: Tx, env: Env, tenant: Tenant, id: string) {
   }
   const [updated] = await tx
     .update(call)
-    .set({ userId: tenant.userId, reservationId: reserved.entry.id })
+    .set({
+      userId: tenant.userId,
+      reservationId: reserved.entry.id,
+      paidMinutes: CALL_RESERVE_MINUTES,
+    })
     .where(eq(call.id, id))
     .returning();
   if (!updated) throw new Error('call update returned no row');

@@ -21,6 +21,7 @@ import type {
   ShortLivedVoiceCredential,
   VoiceProvider,
 } from '../types';
+import { clampTimeLimit } from '../types';
 import { utf8ToBase64 } from './base64';
 import { TelnyxApiError } from './errors';
 import {
@@ -437,6 +438,11 @@ export class TelnyxProvider
       to: input.to,
       from: input.from,
       client_state: utf8ToBase64(input.idempotencyKey),
+      // Telnyx hangs the leg up itself at this limit (hangup_cause `time_limit`). It can only be
+      // set when the leg is created: legs the WebRTC SDK places cannot carry one.
+      ...(input.timeLimitSecs === undefined
+        ? {}
+        : { time_limit_secs: clampTimeLimit(input.timeLimitSecs, 30, 14_400) }),
     });
     const { data } = await this.readJson(res, callSchema);
     return { providerCallId: data.call_control_id, state: 'queued' };

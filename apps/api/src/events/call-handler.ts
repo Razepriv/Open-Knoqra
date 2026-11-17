@@ -9,6 +9,7 @@ import { callBillingOf } from '../lib/pricing';
 import { publish } from '../lib/realtime';
 import { type Applied, applyToCall, parked } from './call-apply';
 import { CALL_ROUTE_PROVIDER_ID_UNIQUE, createInboundCall, inboundOrg } from './call-inbound';
+import { startCallMeter } from './call-meter-schedule';
 import { FOREIGN_CONNECTION, mayApplyTo } from './connector-guard';
 import type { EventHandler, HandlerContext, HandlerResult } from './registry';
 
@@ -101,8 +102,8 @@ async function resolveRoute(
 }
 
 /**
- * Best effort, after commit: neither step throws (both log and swallow). Shared with the
- * stale-call sweep.
+ * Best effort, after commit: no step throws (each logs and swallows). Shared with the stale-call
+ * sweep and the mid-call cut-off.
  */
 export async function fanOutApplied(
   env: Env,
@@ -117,6 +118,8 @@ export async function fanOutApplied(
   if (applied.voicemail) {
     await publish(env, orgId, { type: 'voicemail.created', data: applied.voicemail });
   }
+  // Answered: plan the first mid-call extension (events/call-meter.ts). Never throws.
+  if (applied.transition?.to === 'connected') await startCallMeter(env, orgId, applied.call);
   await runAfterCallApplied(env, orgId, applied);
 }
 

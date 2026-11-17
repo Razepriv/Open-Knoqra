@@ -8,11 +8,13 @@ import { type CallRow, call, callRoute, createDb, type Database, withTenant } fr
 import type { NormalizedCallEvent } from '@knoqra/providers';
 import { and, gt, inArray, lt, notInArray, or, sql } from 'drizzle-orm';
 import { connectionString, type Env } from '../env';
+import { paidMinutesOf } from '../lib/call-json';
 import { logger } from '../lib/logger';
 import { type CallBilling, callBillingOf } from '../lib/pricing';
 import { reportError } from '../observability/report';
 import { type Applied, applyToLockedCall, lockCall } from './call-apply';
 import { fanOutApplied } from './call-handler';
+import { type MeterDeps, meterLiveCalls } from './call-meter';
 
 /**
  * The stale-call sweep (ruling R29). A call whose provider events stopped arriving (a lost
@@ -30,18 +32,20 @@ const PRE_CONNECT_STALE_MS = 10 * 60 * 1000;
 const LIVE_STALE_MS = 4 * 60 * 60 * 1000;
 /** Only organizations that placed or took a call recently can have a live one. */
 const ROUTE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
-/** A swept call never bills more than its reserve covered. */
-const MAX_SWEPT_SECONDS = CALL_RESERVE_MINUTES * 60;
 
 export interface SweepOptions {
   now?: Date;
   /** Limits the sweep to these organizations instead of discovering them (tests). */
   orgIds?: readonly string[];
+  /** For tests: the provider hang-ups of the meter backstop. */
+  fetch?: typeof fetch;
 }
 
 export interface SweepResult {
   swept: number;
   failed: number;
+  /** Live calls the meter backstop extended, warned or cut (events/call-meter.ts). */
+  metered: number;
 }
 
 const ago = (now: Date, ms: number): Date => new Date(now.getTime() - ms);
@@ -86,11 +90,12 @@ async function staleCallIds(db: Database, orgId: string, now: Date): Promise<str
   });
 }
 
-/** Billing (R29): answered_at to the sweep time, capped at the reserve's minutes. */
+/** Billing (R29): answered_at to the sweep time, capped at the minutes the call's holds cover. */
 function sweptSeconds(row: CallRow, now: Date): number | null {
   if (row.answeredAt === null) return null;
   const elapsed = Math.ceil((now.getTime() - row.answeredAt.getTime()) / 1000);
-  return Math.min(Math.max(0, elapsed), MAX_SWEPT_SECONDS);
+  const paid = paidMinutesOf(row) ?? CALL_RESERVE_MINUTES;
+  return Math.min(Math.max(0, elapsed), paid * 60);
 }
 
 /** A provider-shaped hangup for the shared apply path; it is never stored as a raw event. */
@@ -136,8 +141,9 @@ async function sweepCall(
 export async function sweepStaleCalls(env: Env, options: SweepOptions = {}): Promise<SweepResult> {
   const now = options.now ?? new Date();
   const { db, close } = createDb(connectionString(env));
-  const result: SweepResult = { swept: 0, failed: 0 };
+  const result: SweepResult = { swept: 0, failed: 0, metered: 0 };
   const billing = callBillingOf(env);
+  const meterDeps: MeterDeps = { now, ...(options.fetch ? { fetch: options.fetch } : {}) };
   try {
     const orgIds = options.orgIds ?? (await findSweepOrgs(db, now));
     for (const orgId of orgIds) {
@@ -155,6 +161,16 @@ export async function sweepStaleCalls(env: Env, options: SweepOptions = {}): Pro
           reportError(error, { where: 'cron' });
         }
       }
+      try {
+        // Then the mid-call meter's backstop (events/call-meter.ts) on the calls still live.
+        const metered = await meterLiveCalls(db, env, orgId, meterDeps);
+        result.metered += metered.checked;
+        result.failed += metered.failed;
+      } catch (error) {
+        result.failed += 1;
+        logger.error('call_meter.backstop_org_failed', { orgId, error });
+        reportError(error, { where: 'cron' });
+      }
     }
   } finally {
     await close().catch((error: unknown) => logger.warn('db.close_failed', { error }));
@@ -168,5 +184,7 @@ export async function sweepStaleCalls(env: Env, options: SweepOptions = {}): Pro
  */
 export async function runStaleCallSweep(env: Env): Promise<void> {
   const result = await sweepStaleCalls(env);
-  if (result.swept > 0 || result.failed > 0) logger.info('call.sweep_done', { ...result });
+  if (result.swept > 0 || result.failed > 0 || result.metered > 0) {
+    logger.info('call.sweep_done', { ...result });
+  }
 }

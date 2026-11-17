@@ -8,13 +8,14 @@ import {
 } from '@sentry/cloudflare';
 import { CRON_JOBS } from '../cron/jobs';
 import type { Env } from '../env';
+import type { QueueMessage } from '../queue/messages';
 import { type ObservabilityConfig, readObservabilityConfig } from './config';
 import { redactEventPaths } from './redact-event-paths';
 import { setErrorReporter } from './report';
 
 /** The Worker's entry points. Every one of them goes through `observed`. */
 export type KnoqraHandler = Required<
-  Pick<ExportedHandler<Env, { rawEventId: string }>, 'fetch' | 'queue' | 'scheduled'>
+  Pick<ExportedHandler<Env, QueueMessage>, 'fetch' | 'queue' | 'scheduled'>
 >;
 
 export type SentryConfig = NonNullable<ObservabilityConfig['sentry']>;

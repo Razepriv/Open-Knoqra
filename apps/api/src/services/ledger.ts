@@ -1,14 +1,16 @@
 import {
   callReserveMicros,
   evaluateSpend,
+  planCallExtension,
   planCapture,
   planRelease,
   planReserve,
   platformFeeMicros,
+  type SpendCutoffReason,
   type SpendDecision,
 } from '@knoqra/core';
 import { type LedgerEntryRow, ledgerEntry, type Tx, type WalletRow, wallet } from '@knoqra/db';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 
 /** Development and test organizations start with $5 so the fake provider can place calls. */
 export const STARTER_CREDIT_MICROS = 5_000_000;
@@ -19,6 +21,13 @@ export const STARTER_CREDIT_KEY = 'starter-credit';
  * pipeline both use it, so a call is settled at most once whichever path gets there first.
  */
 export const callSettleKey = (callId: string): string => `call:${callId}:settle`;
+
+/**
+ * The key of a hold added mid-call, named by the paid minutes the call had before it: each block is
+ * held at most once, however often the meter runs.
+ */
+export const callExtendKey = (callId: string, fromPaidMinutes: number): string =>
+  `call:${callId}:extend:${fromPaidMinutes}`;
 
 /** The one idempotency key of a call's platform fee: a call is charged the fee at most once. */
 export const callFeeKey = (callId: string): string => `call:${callId}:fee`;
@@ -444,4 +453,114 @@ export async function chargePlatformFee(
   const existing = await entryByKey(tx, input.orgId, key);
   if (existing?.kind !== 'fee') throw new LedgerError('idempotency_conflict');
   return existing;
+}
+
+export interface CallExtensionInput {
+  orgId: string;
+  callId: string;
+  /** The paid minutes the call has now; the hold's key. */
+  fromPaidMinutes: number;
+  /** One more billed minute: the call's price plus the platform fee. */
+  perMinuteMicros: number;
+}
+
+export type CallExtensionResult =
+  | { kind: 'extended'; minutes: number; entry: LedgerEntryRow }
+  | { kind: 'refused'; reason: SpendCutoffReason };
+
+/**
+ * Holds more minutes for a call in progress: up to one block, as many whole minutes as the wallet
+ * and the monthly stop cap allow (`planCallExtension`). Under the wallet lock like every reserve, so
+ * the check and the insert see one balance. The hold's key makes a replay return the first hold.
+ * Callers lock the call row first (the same order as settlement), so a hold is never added to a
+ * call that has already been settled.
+ */
+export async function extendCallHold(
+  tx: Tx,
+  input: CallExtensionInput,
+): Promise<CallExtensionResult> {
+  assertMicros(input.perMinuteMicros, 1);
+  const walletRow = await walletOf(tx, input.orgId, true);
+  const key = callExtendKey(input.callId, input.fromPaidMinutes);
+  const existing = await entryByKey(tx, input.orgId, key);
+  if (existing) {
+    if (existing.kind !== 'reserve' || existing.walletId !== walletRow.id) {
+      throw new LedgerError('idempotency_conflict');
+    }
+    const minutes = Math.floor(existing.heldDeltaMicros / input.perMinuteMicros);
+    return { kind: 'extended', minutes, entry: existing };
+  }
+  const t = await totals(tx, walletRow, new Date());
+  const plan = planCallExtension({
+    availableMicros: t.balanceMicros - t.heldMicros,
+    periodSpendMicros: t.periodSpendMicros,
+    heldMicros: t.heldMicros,
+    warnCapMicros: walletRow.warnCapMicros,
+    stopCapMicros: walletRow.stopCapMicros,
+    perMinuteMicros: input.perMinuteMicros,
+  });
+  if (plan.kind === 'refuse') return { kind: 'refused', reason: plan.reason };
+  const [entry] = await tx
+    .insert(ledgerEntry)
+    .values({
+      organizationId: input.orgId,
+      walletId: walletRow.id,
+      kind: 'reserve',
+      ...planReserve(plan.amountMicros),
+      refType: 'call',
+      refId: input.callId,
+      idempotencyKey: key,
+      note: `Call extended, ${plan.minutes} min`,
+    })
+    .returning();
+  if (!entry) throw new Error('reserve insert returned no row');
+  return { kind: 'extended', minutes: plan.minutes, entry };
+}
+
+export interface CallSettleInput {
+  orgId: string;
+  callId: string;
+  /** The hold placed when the call was authorized or answered (`call.reservation_id`). */
+  reservationId: string;
+  costMicros: number;
+}
+
+/**
+ * Closes every hold of a call exactly once: the first hold is settled with the whole cost (a
+ * capture, which may exceed that hold, or a release at cost 0) under `callSettleKey`, and each hold
+ * added mid-call is released under its own key. The balance moves by the cost alone, held drops by
+ * everything the call held, and a replay changes nothing. Returns the first hold's close.
+ */
+export async function settleCallHolds(tx: Tx, input: CallSettleInput): Promise<LedgerEntryRow> {
+  const main = await settleReservation(tx, {
+    orgId: input.orgId,
+    reservationId: input.reservationId,
+    costMicros: input.costMicros,
+    idempotencyKey: callSettleKey(input.callId),
+    refType: 'call',
+    refId: input.callId,
+  });
+  const extensions = await tx
+    .select()
+    .from(ledgerEntry)
+    .where(
+      and(
+        eq(ledgerEntry.organizationId, input.orgId),
+        eq(ledgerEntry.kind, 'reserve'),
+        eq(ledgerEntry.refType, 'call'),
+        eq(ledgerEntry.refId, input.callId),
+        ne(ledgerEntry.id, input.reservationId),
+      ),
+    );
+  for (const hold of extensions) {
+    await settleReservation(tx, {
+      orgId: input.orgId,
+      reservationId: hold.id,
+      costMicros: 0,
+      idempotencyKey: `${hold.idempotencyKey}:settle`,
+      refType: 'call',
+      refId: input.callId,
+    });
+  }
+  return main;
 }

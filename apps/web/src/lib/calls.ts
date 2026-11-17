@@ -181,6 +181,41 @@ export function spendNoteCopy(outcome: string, reason: string): string | null {
     : 'Spend cap reached. Raise it in the wallet to call.';
 }
 
+export type CallCutOffReason = NonNullable<Call['cutOff']>['reason'];
+
+const CUT_OFF_WARNING: Record<CallCutOffReason, string> = {
+  insufficient_funds: 'Out of credit. This call will end soon. Add credit to keep talking.',
+  stop_cap:
+    'Monthly spend cap reached. This call will end soon. An owner or admin can raise the cap in the wallet.',
+  paid_time_over: 'This call will end soon: no more minutes could be held for it.',
+};
+
+const CUT_OFF_ENDED: Record<CallCutOffReason, string> = {
+  insufficient_funds: 'Call ended: out of credit',
+  stop_cap: 'Call ended: monthly spend cap reached',
+  paid_time_over: 'Call ended: no more minutes could be held',
+};
+
+/** The warning on a live call the server will end because no more minutes could be held. */
+export function cutOffWarningCopy(reason: CallCutOffReason): string {
+  return CUT_OFF_WARNING[reason];
+}
+
+/** How a call KNOQRA ended for lack of credit ended, or null for any other call. */
+export function cutOffEndedCopy(
+  call: Pick<Call, 'hangupCause' | 'cutOff' | 'state'>,
+): string | null {
+  if (!isEndedCallState(call.state) || call.hangupCause !== 'cut_off' || !call.cutOff) return null;
+  return CUT_OFF_ENDED[call.cutOff.reason];
+}
+
+/** Whole seconds until a live call's cut-off, never below 0; null when none is planned. */
+export function secondsUntilCutOff(call: Pick<Call, 'cutOff' | 'state'>, now: Date): number | null {
+  if (!call.cutOff || isEndedCallState(call.state)) return null;
+  const ms = Date.parse(call.cutOff.at) - now.getTime();
+  return Number.isFinite(ms) ? Math.max(0, Math.ceil(ms / 1000)) : null;
+}
+
 /** The copy for whatever a call mutation threw (ApiError and VoiceError both carry a `code`). */
 export function callErrorMessage(error: unknown, reason?: string): string {
   const code = (error as { code?: unknown } | null)?.code;

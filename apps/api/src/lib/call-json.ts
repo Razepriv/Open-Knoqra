@@ -1,5 +1,11 @@
 import { z } from '@hono/zod-openapi';
-import { CALL_OUTCOMES, CALL_STATES } from '@knoqra/core';
+import {
+  CALL_CUTOFF_REASONS,
+  CALL_OUTCOMES,
+  CALL_RESERVE_MINUTES,
+  CALL_STATES,
+  paidUntil,
+} from '@knoqra/core';
 import { type CallRow, call, contact, type Tx } from '@knoqra/db';
 import { and, eq, type SQL } from 'drizzle-orm';
 
@@ -28,6 +34,20 @@ export const CallSchema = z
     outcome: z.enum(CALL_OUTCOMES).nullable(),
     outcomeNote: z.string().nullable(),
     reviewConfirmed: z.boolean(),
+    /**
+     * When the minutes held for the call run out (the answer plus its paid minutes). The server
+     * tries to hold more shortly before. Null until the call is answered, or when it holds nothing.
+     */
+    paidUntil: z.iso.datetime().nullable(),
+    /**
+     * Set when the wallet or the monthly spend cap could not pay for more minutes. On a live call,
+     * the call will be ended at `at` unless credit is added first; on an ended call whose
+     * `hangupCause` is `cut_off`, KNOQRA ended it then.
+     */
+    cutOff: z
+      .object({ reason: z.enum(CALL_CUTOFF_REASONS), at: z.iso.datetime() })
+      .nullable()
+      .openapi('CallCutOff'),
   })
   .openapi('Call');
 export type CallJson = z.infer<typeof CallSchema>;
@@ -39,6 +59,21 @@ export interface CallWithContact {
 }
 
 const iso = (value: Date | null): string | null => value?.toISOString() ?? null;
+
+/**
+ * The billed minutes a call's holds cover: the stored count, or the first block for a call that
+ * holds something but was authorized before mid-call metering (no stored count). Null without a hold.
+ */
+export function paidMinutesOf(row: Pick<CallRow, 'paidMinutes' | 'reservationId'>): number | null {
+  if (row.paidMinutes !== null) return row.paidMinutes;
+  return row.reservationId === null ? null : CALL_RESERVE_MINUTES;
+}
+
+function paidUntilOf(row: CallRow): string | null {
+  const paid = paidMinutesOf(row);
+  if (row.answeredAt === null || paid === null) return null;
+  return paidUntil(row.answeredAt, paid).toISOString();
+}
 
 export function toCallJson({ row, contact: who }: CallWithContact): CallJson {
   return {
@@ -58,6 +93,11 @@ export function toCallJson({ row, contact: who }: CallWithContact): CallJson {
     outcome: row.outcome,
     outcomeNote: row.outcomeNote,
     reviewConfirmed: row.reviewConfirmed,
+    paidUntil: paidUntilOf(row),
+    cutOff:
+      row.cutoffReason !== null && row.cutoffAt !== null
+        ? { reason: row.cutoffReason, at: row.cutoffAt.toISOString() }
+        : null,
   };
 }
 

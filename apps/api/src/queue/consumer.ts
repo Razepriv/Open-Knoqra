@@ -1,11 +1,13 @@
 import { createDb, type Database } from '@knoqra/db';
 import { connectionString, type Env } from '../env';
 import { guardOutboundCall } from '../events/call-guard';
+import { runCallMeter } from '../events/call-meter';
 import { claimRawEvent, markIgnored, markParked, rawEventStatus } from '../events/raw-event';
 import { dispatch, normalizerFor } from '../events/registry';
 import { configureLogging, logger } from '../lib/logger';
 import { MessageNotYetKnownError } from '../messaging/ingest';
 import { reportError } from '../observability/report';
+import { isCallMeterMessage, type QueueMessage } from './messages';
 
 type Outcome = 'skipped' | 'ignored' | 'parked' | 'processed';
 
@@ -79,12 +81,13 @@ async function processRawEvent(
 }
 
 /**
- * Applies queued provider events. Parked, ignored and replayed messages are acked. A receipt whose
- * message is not yet known retries after a short delay; any other unexpected error retries that
- * message (the queue's max_retries then dead-letters it). Logs carry ids, never the event body.
+ * Applies queued provider events and runs mid-call meter steps (events/call-meter.ts). Parked,
+ * ignored and replayed messages are acked. A receipt whose message is not yet known retries after a
+ * short delay; any other unexpected error retries that message (the queue's max_retries then
+ * dead-letters it). Logs carry ids, never the event body.
  */
 export async function handleProviderEvents(
-  batch: MessageBatch<{ rawEventId: string }>,
+  batch: MessageBatch<QueueMessage>,
   env: Env,
   deps: ConsumerDeps = {},
 ): Promise<void> {
@@ -92,17 +95,35 @@ export async function handleProviderEvents(
   const { db, close } = createDb(connectionString(env));
   try {
     for (const msg of batch.messages) {
+      const body: unknown = msg.body;
+      if (isCallMeterMessage(body)) {
+        try {
+          await runCallMeter(db, env, body, deps);
+          msg.ack();
+        } catch (error) {
+          logger.error('call_meter.failed', { callId: body.callId, step: body.step, error });
+          reportError(error, { where: 'call_meter' });
+          msg.retry();
+        }
+        continue;
+      }
+      const rawEventId = rawEventIdOf(body);
+      if (rawEventId === null) {
+        logger.error('queue.unknown_message', {});
+        msg.ack();
+        continue;
+      }
       try {
-        await processRawEvent(db, env, msg.body.rawEventId, deps);
+        await processRawEvent(db, env, rawEventId, deps);
         msg.ack();
       } catch (error) {
         if (error instanceof MessageNotYetKnownError) {
           // Expected race, not a fault: not sent to Sentry.
-          logger.warn('messaging.message_not_yet_known', { rawEventId: msg.body.rawEventId });
+          logger.warn('messaging.message_not_yet_known', { rawEventId });
           // The send that owns this receipt may not have stored its provider id yet.
           msg.retry({ delaySeconds: NOT_YET_KNOWN_RETRY_SECONDS });
         } else {
-          logger.error('queue.process_failed', { rawEventId: msg.body.rawEventId, error });
+          logger.error('queue.process_failed', { rawEventId, error });
           reportError(error, { where: 'queue' });
           msg.retry();
         }
@@ -111,4 +132,11 @@ export async function handleProviderEvents(
   } finally {
     await close().catch((error: unknown) => logger.warn('db.close_failed', { error }));
   }
+}
+
+/** The raw event id of a provider-event message, or null for anything else. */
+export function rawEventIdOf(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const id = (body as { rawEventId?: unknown }).rawEventId;
+  return typeof id === 'string' && id !== '' ? id : null;
 }

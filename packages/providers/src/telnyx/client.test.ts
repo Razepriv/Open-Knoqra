@@ -110,6 +110,28 @@ describe('TelnyxProvider calls', () => {
     expect(calls[0]?.headers.get('content-type')).toBe('application/json');
   });
 
+  it('sets the leg time limit, clamped to Telnyx range', async () => {
+    const { calls, fetchImpl } = stubFetch(
+      [600, 5, 99_999].map(() => ({
+        method: 'POST',
+        url: `${BASE}/calls`,
+        respond: json(200, { data: { call_control_id: 'v3:abc' } }),
+      })),
+    );
+    for (const timeLimitSecs of [600, 5, 99_999]) {
+      await provider(fetchImpl).createCall({
+        orgId: 'org_abc',
+        from: '+12025550101',
+        to: '+12025550123',
+        idempotencyKey: 'idem_key_1',
+        timeLimitSecs,
+      });
+    }
+    expect(calls.map((c) => (c.body as { time_limit_secs?: number }).time_limit_secs)).toEqual([
+      600, 30, 14_400,
+    ]);
+  });
+
   it('hangs up by call control id', async () => {
     const { calls, fetchImpl } = stubFetch([
       {
