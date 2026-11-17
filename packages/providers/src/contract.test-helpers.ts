@@ -81,7 +81,8 @@ export function runAdapterContract(
           : { ...baseBody, type: 'call.exploded' },
       );
       const { adapter } = await makeSigned(body);
-      expect(adapter.parse(body)).toEqual({
+      // An adapter may also pass the parsed body on (for an edition's extension to handle).
+      expect(adapter.parse(body)).toMatchObject({
         ok: true,
         value: { kind: 'ignored', eventType: 'call.exploded' },
       });

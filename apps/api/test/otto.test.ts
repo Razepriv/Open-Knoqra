@@ -77,7 +77,7 @@ beforeAll(async () => {
 });
 
 describe('POST /api/v1/otto/drafts', () => {
-  it('briefs from the contact timeline, cites the note and meters one usage event', async () => {
+  it('briefs from the contact timeline, cites the note and meters one request', async () => {
     const ct = await newContact(cookieA, 'Maya Okafor');
     const noteId = await addNote(cookieA, ct, 'Prefers mornings');
     const before = (await usageRows(orgA, userA)).length;
@@ -96,12 +96,12 @@ describe('POST /api/v1/otto/drafts', () => {
     expect(rows).toHaveLength(before + 1);
     expect(rows.find((u) => u.refId === d.id)).toMatchObject({
       service: 'ai',
-      unit: 'tokens',
+      unit: 'request',
       refType: 'otto_draft',
       provider: 'mock',
       costMicros: 0,
       idempotencyKey: `otto:${d.id}`,
-      quantity: d.usage.inputTokens + d.usage.outputTokens,
+      quantity: 1,
     });
     const audits = await withAppDb((db) =>
       withTenant(db, orgA, (tx) =>
@@ -109,7 +109,11 @@ describe('POST /api/v1/otto/drafts', () => {
       ),
     );
     expect(audits).toHaveLength(1);
-    expect(audits[0]).toMatchObject({ action: 'otto.brief', outcome: 'allowed' });
+    expect(audits[0]).toMatchObject({
+      action: 'otto.brief',
+      outcome: 'allowed',
+      metadata: { kind: 'brief', provider: 'mock' },
+    });
     expect(JSON.stringify(audits[0]?.metadata)).not.toContain('Prefers');
   });
 

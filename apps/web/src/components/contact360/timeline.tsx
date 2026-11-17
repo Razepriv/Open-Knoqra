@@ -9,6 +9,7 @@ import {
   SquareCheck,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { deskSlot } from '../../extensions';
 import { groupByDay, type TimelineEvent } from '../../lib/contact360';
 import { type TimelineFilter, useTimeline } from '../../lib/contact360-queries';
 import { formatTime } from '../../lib/format';
@@ -237,6 +238,7 @@ const ROW_LOOK: Record<TimelineEvent['kind'], string> = {
  * meta line with where it came from (an internal note also says it was never sent).
  */
 function EntryBody({ event }: { event: TimelineEvent }) {
+  const Extra = deskSlot('TimelineEntryExtra');
   const meta = [
     event.kind === 'note' ? 'Internal only · not sent' : null,
     event.source ? sourceLabel(event.source) : null,
@@ -252,6 +254,7 @@ function EntryBody({ event }: { event: TimelineEvent }) {
         <p className="whitespace-pre-wrap break-words text-[13px] leading-[1.45]">{event.body}</p>
       ) : null}
       {meta.length > 0 ? <p className={`${mono} leading-[1.5]`}>{meta.join(' · ')}</p> : null}
+      {Extra ? <Extra event={event} /> : null}
     </div>
   );
 }

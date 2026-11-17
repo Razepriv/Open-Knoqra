@@ -6,8 +6,9 @@ test('sign up lands on home with personal workspace, then sign out and back in',
   const email = `e2e+${Date.now()}@example.test`;
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill('Ana Silva');
-  await page.getByLabel('Email').fill(email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
   await page.getByLabel('Password').fill('correct-horse-battery');
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(
     page.getByRole('heading', { name: /Good (morning|afternoon|evening), Ana/ }),
@@ -18,7 +19,7 @@ test('sign up lands on home with personal workspace, then sign out and back in',
   await page.getByRole('button', { name: 'Account menu' }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/sign-in/);
-  await page.getByLabel('Email').fill(email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(email);
   await page.getByLabel('Password').fill('wrong-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByText("That email and password don't match.")).toBeVisible();
@@ -43,8 +44,11 @@ test('showcase renders the component kit and the theme toggle sets data-theme', 
 async function signUp(page: import('@playwright/test').Page) {
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill('Ana Silva');
-  await page.getByLabel('Email').fill(`e2e+${Date.now()}@example.test`);
+  await page
+    .getByRole('textbox', { name: 'Email', exact: true })
+    .fill(`e2e+${Date.now()}@example.test`);
   await page.getByLabel('Password').fill('correct-horse-battery');
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(
     page.getByRole('heading', { name: /Good (morning|afternoon|evening), Ana/ }),

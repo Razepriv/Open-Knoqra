@@ -361,7 +361,7 @@ The Inbox polls: the conversation list every 5 s, an open conversation every 4 s
 - `VoiceProvider`: create a short-lived client session, create and end calls, fetch usage (`createCall` is implemented for Telnyx but unused in M2, because the browser dials)
 - `MessagingProvider`: send SMS and WhatsApp messages
 - `WebhookAdapter`: `verify(headers, rawBody)` and `parse(rawBody)` into a normalized `ProviderEvent`
-- `AiProvider`: `complete(request)` for drafts, briefs and digests (see [Otto](#otto-and-ai-metering-m5))
+- `AiProvider`: `complete(request)` for drafts, briefs and digests, and an optional `stream(request, onText)` (see [Otto](#otto-and-ai-metering))
 
 **Registry and connectors.** `packages/providers/src/registry.ts` names the real providers a workspace can connect (`telnyx`, `plivo`) with their capabilities and whether each has run against a live account. `apps/api/src/connectors/registry.ts` is the API half: per provider, the body a workspace sends to connect, how its secret is sealed and opened, how its provider objects are built from the stored row, and where its webhooks post. A workspace holds one connector at a time (`provider_credential` is unique per organization); connecting a second answers 409 `connector_conflict`. Settings › Connectors (`GET /api/v1/connectors`, `PUT /api/v1/connectors/{telnyx|plivo}`, `DELETE /api/v1/connectors/{provider}`) shows each offered provider with its status and webhook URLs. `CONNECTORS` decides which providers a deployment offers. Plivo (`packages/providers/src/plivo/`) covers voice, numbers, purchase, balance and usage, but not messaging, and is built against fixtures only.
 
@@ -392,26 +392,27 @@ New tenant tables, all with forced row-level security (`packages/db/sql/rls.sql`
 
 **The focus timer is client-side.** Its end time lives in `localStorage`; focus sessions are not stored on the server.
 
-## Otto and AI metering (M5)
+## Otto and AI metering
 
-Otto drafts a message, writes a brief about a contact, or summarizes what the user missed (`POST /api/v1/otto/drafts` and `/otto/digest`). Every output is labelled as a draft, brief or "what you missed", shows its sources as "FROM: ..." citations, and is never sent anywhere.
+Otto drafts a message, writes a brief about a contact, or summarizes what the user missed (`POST /api/v1/otto/drafts` and `/otto/digest`, or their `/stream` twins, which answer with server-sent events). Every output is labelled as a draft, brief or "what you missed", shows its sources as "FROM: ..." citations, and is never sent anywhere.
 
-1. The route resolves the provider with `aiProviderFor(env)`. `AI_PROVIDER` unset or `mock` gives `MockAiProvider`; any other value throws, which shows as a 500 on the Otto routes only.
-2. Inside one tenant transaction, `otto/sources.ts` gathers sources the user may see: the contact's profile, a consent summary, the latest timeline events and open tasks, or, for the digest, teammates' events, unread notifications and overdue tasks.
-3. The daily quota is checked (`OTTO_DAILY_LIMIT`, 50 provider calls per user per organization per UTC day, counted from `usage_event` rows with `service = 'ai'`). Over the limit is `429 quota_exceeded`.
-4. `completeWithCitations` calls the provider and treats its answer as untrusted: the shape is validated, a throw becomes `503 ai_unavailable`, and only citations naming one of the sources the API sent survive. A failed call stores no draft and no usage event.
-5. On success the transaction stores the `otto_draft`, a `usage_event` and an `audit_event` whose metadata never holds text, prompts or instructions. A digest with nothing to report is answered locally and does not call the provider or use quota.
+**Where answers come from** (`otto/access.ts`, `resolveOttoAccess`), first match wins:
 
-`MockAiProvider` is deterministic: it opens with a short line and echoes up to five sources as bullets, citing them, so citations can be tested. Drafts are copied by the user, not sent, until the M3 composer can take them.
+1. The workspace's own connection in Settings → Otto (`ai_credential`, one row per workspace): an OpenAI API key, checked against `GET /v1/models` before it is saved, or, while `OTTO_CHATGPT_SIGNIN` is on, a "Sign in with ChatGPT" token set (`otto/chatgpt.ts`). The secret is sealed with `CREDENTIALS_MASTER_KEY` under the AAD `<orgId>:otto:<kind>` and never leaves the API; Settings shows the key's last four characters.
+2. The edition's plan, through the `ottoPlan` extension slot. The core includes nothing; KNOQRA Cloud includes Otto on Pro and Max with its platform key.
+3. The instance's `AI_PROVIDER`: `openai` (one key for every workspace), `mock`, or `none`. Unset is `mock` in development and tests and `none` elsewhere.
 
-### What a real AI provider needs
+Otherwise the Otto routes answer `409 otto_not_connected` (or `402 otto_upgrade_required` when the edition says the plan must change), and the Desk links to Settings.
 
-- Implement `AiProvider` in `@knoqra/providers` and add it to `aiProviderFor`.
-- Move the provider call out of the database transaction. Today it runs inside one, with the tenant lock held; with a slow model that pins a pooled connection. Reserve quota, commit, call the provider, then record the draft and usage in a second transaction.
-- Record the real cost in `cost_micros` (the mock writes 0).
-- Add a provider timeout, so a hung call becomes `ai_unavailable` instead of a stuck request.
-- Review the data processing agreement and consent first: contact data leaves the system in the prompt.
-- Build the free-form "Ask" box from the design. It needs retrieval over the user's data, so it waits for a real provider.
+**A request:**
+
+1. In one tenant transaction, `otto/sources.ts` gathers only what the user asked about: the contact's profile, a consent summary, the latest timeline events and open tasks, or, for the digest, teammates' events, unread notifications and overdue tasks. The same transaction resolves the connection, checks the workspace's daily limit (counted from `usage_event` rows with `service = 'ai'` since midnight UTC, under a per-workspace advisory lock) and reserves one request: a `usage_event` row with `unit = 'request'`. Over the limit is `429 quota_exceeded`. Limits: 50 on the instance model or the mock, 500 on a workspace's own key or ChatGPT plan, and the plan's limit on KNOQRA Cloud.
+2. The transaction commits, then the model is called with no transaction open. OpenAI is reached through the Responses API, streamed and with `store: false`; another OpenAI-compatible server (`AI_BASE_URL`, or an edition's platform model) through Chat Completions. On OpenRouter every request carries `provider: { data_collection: "deny", zdr: true }`, so it only reaches endpoints that neither train on nor keep prompts; a model with no such endpoint fails and is logged as `otto.no_private_endpoint`. A call is cut off after 90 seconds. `completeWithCitations` treats the answer as untrusted: the shape is validated, a failure becomes `503 ai_unavailable` (logged with its status or error code only), and only citations naming one of the sources sent survive. A rate-limited, overloaded or timed-out shared model (the instance's or the edition's) answers `503 ai_busy` ("Otto is busy right now") instead of `ai_unavailable`. A failed call keeps its reserved request.
+3. A second transaction stores the `otto_draft` and an `audit_event` whose metadata never holds text, prompts or instructions. A digest with nothing to report is answered locally and uses no request.
+
+`MockAiProvider` is deterministic: it opens with a short line and echoes up to five sources as bullets, citing them, so citations can be tested. It streams a word at a time. Drafts are copied by the user, not sent.
+
+Still open: the real cost in `cost_micros` (written as 0), and the free-form "Ask" box from the design, which needs retrieval over the user's data.
 
 ## Voice pipeline
 

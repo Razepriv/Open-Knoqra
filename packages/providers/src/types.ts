@@ -117,7 +117,8 @@ export interface NumbersProvider {
 export type NumberFeature = 'voice' | 'sms' | 'mms';
 
 export interface NumberSearch {
-  country: 'US';
+  /** `CA` is searched on Telnyx only; the other providers search the US. */
+  country: 'US' | 'CA';
   /** 3 digits. */
   areaCode?: string;
   locality?: string;
@@ -126,6 +127,17 @@ export interface NumberSearch {
   features: NumberFeature[];
   /** At most 20. */
   limit?: number;
+}
+
+/** What to buy, and where to attach it. */
+export interface NumberOrderInput {
+  e164: string;
+  /** The voice connection (Telnyx) or application (Plivo) to attach; null leaves it unattached. */
+  connectionId: string | null;
+  /** Telnyx: the messaging profile to attach. Other providers ignore it. */
+  messagingProfileId?: string | null;
+  /** Telnyx: a reference stored on the order and its numbers. Other providers ignore it. */
+  customerReference?: string | null;
 }
 
 /** Prices are integer micro-units (1 USD = 1,000,000). */
@@ -148,8 +160,8 @@ export interface NumberOrderResult {
 export interface NumberPurchaseProvider {
   searchAvailableNumbers(q: NumberSearch): Promise<AvailableNumber[]>;
   /** A fresh price read for exactly this number, or null when it is no longer available. */
-  quoteNumber(e164: string): Promise<AvailableNumber | null>;
-  orderNumber(input: { e164: string; connectionId: string | null }): Promise<NumberOrderResult>;
+  quoteNumber(e164: string, country?: 'US' | 'CA'): Promise<AvailableNumber | null>;
+  orderNumber(input: NumberOrderInput): Promise<NumberOrderResult>;
 }
 
 /** What a release did: `released` now, or `not_found` (the provider no longer has the number). */
@@ -215,7 +227,12 @@ export interface ProviderEvent {
 
 export type ParseOutcome =
   | { kind: 'event'; event: ProviderEvent; body: unknown }
-  | { kind: 'ignored'; eventType: string };
+  /**
+   * An event the core does not model. `body` is the parsed JSON when the adapter read it, so an
+   * edition's extension can handle event types the core leaves alone (see the API's
+   * `ApiExtension.providerWebhook`).
+   */
+  | { kind: 'ignored'; eventType: string; body?: unknown };
 
 /** Both methods work on the exact bytes received: signatures are over bytes, never decoded text. */
 export interface WebhookAdapter {
@@ -228,6 +245,8 @@ export interface AiRequest {
   purpose: 'draft' | 'brief' | 'digest';
   prompt: string;
   sources: { kind: string; ref: string; text: string }[];
+  /** Aborts the model call, for example on a timeout. */
+  signal?: AbortSignal;
 }
 export interface AiResult {
   text: string;
@@ -236,4 +255,10 @@ export interface AiResult {
 }
 export interface AiProvider {
   complete(req: AiRequest): Promise<AiResult>;
+  /**
+   * Like `complete`, but hands each piece of text to `onText` as the model writes it. The result is
+   * the whole answer, the same as `complete` would return. Optional: without it, callers use
+   * `complete` and get the text in one piece.
+   */
+  stream?(req: AiRequest, onText: (delta: string) => void): Promise<AiResult>;
 }

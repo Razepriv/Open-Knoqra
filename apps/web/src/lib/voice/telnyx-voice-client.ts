@@ -1,8 +1,10 @@
 import {
   type AnswerInput,
+  type CallAudioStreams,
   checkMicrophone,
   type DialInput,
   type GetUserMedia,
+  NO_CALL_AUDIO,
   type VoiceClient,
   type VoiceCredential,
   VoiceError,
@@ -15,6 +17,10 @@ export interface TelnyxCallLike {
   muteAudio(): void;
   unmuteAudio(): void;
   dtmf(digits: string): void;
+  /** The microphone stream the SDK sends, once the call's media is up. */
+  localStream?: MediaStream | null | undefined;
+  /** The far side's stream, once the call's media is up. */
+  remoteStream?: MediaStream | null | undefined;
 }
 
 /**
@@ -190,6 +196,13 @@ export class TelnyxVoiceClient implements VoiceClient {
     this.current?.dtmf(digits);
   }
 
+  audioStreams(): CallAudioStreams {
+    const call = this.current;
+    if (!call) return NO_CALL_AUDIO;
+    const remote = call.remoteStream ?? this.audio?.element.srcObject ?? null;
+    return { local: call.localStream ?? null, remote: isMediaStream(remote) ? remote : null };
+  }
+
   disconnect(): void {
     if (this.client) dispose(this.client);
     this.client = null;
@@ -259,4 +272,9 @@ function dispose(client: TelnyxClientLike): void {
     client.off(event);
   }
   client.disconnect();
+}
+
+/** A MediaStream, checked without assuming the global exists (tests and old browsers). */
+function isMediaStream(value: unknown): value is MediaStream {
+  return typeof MediaStream !== 'undefined' && value instanceof MediaStream;
 }

@@ -121,7 +121,7 @@ test('"Trust this device" lets the next sign-in on this browser skip the challen
   await context.addCookies(trust);
 
   await page.goto('/sign-in');
-  await page.getByLabel('Email').fill(account.email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/$/);

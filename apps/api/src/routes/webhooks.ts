@@ -62,16 +62,24 @@ export async function ingestWebhook(
      * duplicate). Must not throw or block: the emergency fast path schedules its work and returns.
      */
     afterStore?: (stored: { rawEventId: string; body: unknown }) => void;
+    /**
+     * A verified event the core does not model, offered to the editions' extensions
+     * (`ApiExtension.providerWebhook`, see `offerToExtensions`). Nothing is stored for it. May throw,
+     * which answers 500 so the provider delivers it again.
+     */
+    unmodeled?: (delivery: { eventType: string; body: unknown }) => Promise<void>;
   } = {},
 ): Promise<IngestResult> {
   if (!(await adapter.verify(headers, rawBody))) return { status: 401, error: 'invalid_signature' };
   const parsed = adapter.parse(rawBody);
   if (!parsed.ok) return { status: 400, error: 'invalid_payload' };
   if (parsed.value.kind === 'ignored') {
+    const { eventType, body } = parsed.value;
     logger.debug('webhook.ignored', {
       provider: adapter.provider,
-      eventType: parsed.value.eventType.slice(0, MAX_LOGGED_EVENT_TYPE),
+      eventType: eventType.slice(0, MAX_LOGGED_EVENT_TYPE),
     });
+    if (opts.unmodeled && body !== undefined) await opts.unmodeled({ eventType, body });
     return { status: 200, ignored: true };
   }
   const event = parsed.value.event;
@@ -156,6 +164,27 @@ export function emergencyFastPath(
       deps.waitUntil(task);
     } catch {
       // No execution context: the task still runs, just unawaited.
+    }
+  };
+}
+
+/**
+ * Offers a verified event the core does not model to each extension with a `providerWebhook`
+ * hook, until one handles it. Undefined when no extension has one (the core alone drops it).
+ */
+export function offerToExtensions(
+  env: Env,
+  provider: string,
+  connectorOrgId: string | null,
+  waitUntil: (promise: Promise<unknown>) => void,
+): ((delivery: { eventType: string; body: unknown }) => Promise<void>) | undefined {
+  const handlers = (env.EXTENSIONS ?? []).flatMap((extension) =>
+    extension.providerWebhook ? [extension.providerWebhook] : [],
+  );
+  if (handlers.length === 0) return undefined;
+  return async ({ eventType, body }) => {
+    for (const handle of handlers) {
+      if (await handle(env, { provider, eventType, body, connectorOrgId, waitUntil })) return;
     }
   };
 }
@@ -253,10 +282,12 @@ export const webhooks = new Hono<AppEnv>()
     if (!adapter) return fail(c, 404, 'not_found', 'Unknown provider.');
 
     const rawBody = new Uint8Array(await c.req.arrayBuffer());
+    const unmodeled = offerToExtensions(c.env, adapter.provider, null, waitUntilOf(c));
     const result = await ingestWebhook(c.env, adapter, c.req.raw.headers, rawBody, {
       ...(adapter.provider === 'telnyx'
         ? { afterStore: emergencyFastPath(c.env, null, { waitUntil: waitUntilOf(c) }) }
         : {}),
+      ...(unmodeled ? { unmodeled } : {}),
     });
     if (result.status === 401) return fail(c, 401, 'invalid_signature', 'Signature check failed.');
     if (result.status === 400) return fail(c, 400, 'invalid_payload', 'Unrecognized payload.');
@@ -274,11 +305,13 @@ export const webhooks = new Hono<AppEnv>()
     if (!adapter) return fail(c, 401, 'invalid_signature', 'Signature check failed.');
 
     const rawBody = new Uint8Array(await c.req.arrayBuffer());
+    const unmodeled = offerToExtensions(c.env, provider, orgId, waitUntilOf(c));
     const result = await ingestWebhook(c.env, adapter, c.req.raw.headers, rawBody, {
       organizationId: orgId,
       ...(provider === 'telnyx'
         ? { afterStore: emergencyFastPath(c.env, orgId, { waitUntil: waitUntilOf(c) }) }
         : {}),
+      ...(unmodeled ? { unmodeled } : {}),
     });
     if (result.status === 401) return fail(c, 401, 'invalid_signature', 'Signature check failed.');
     if (result.status === 400) return fail(c, 400, 'invalid_payload', 'Unrecognized payload.');

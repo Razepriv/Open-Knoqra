@@ -29,11 +29,14 @@ export class OrgRealtime extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  /** Sends `message` to every connected socket and returns how many it reached. */
-  async broadcast(message: RealtimeMessage): Promise<number> {
+  /**
+   * Sends `message` to every connected socket, or with `userId` only to that user's sockets (each
+   * socket is tagged with its user when accepted), and returns how many it reached.
+   */
+  async broadcast(message: RealtimeMessage, userId?: string): Promise<number> {
     const frame = JSON.stringify(message);
     let sent = 0;
-    for (const ws of this.ctx.getWebSockets()) {
+    for (const ws of this.ctx.getWebSockets(userId)) {
       try {
         ws.send(frame);
         sent += 1;

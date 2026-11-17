@@ -5,7 +5,11 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { organization, twoFactor } from 'better-auth/plugins';
-import { announceNewsletterChange, saveNewsletterChoice } from '../email/newsletter';
+import {
+  announceNewsletterChange,
+  saveNewsletterChoice,
+  saveTermsAcceptance,
+} from '../email/newsletter';
 import { passwordResetEmail } from '../email/templates';
 import { emailContext, sendWelcomeEmail, welcomeFacts } from '../email/welcome';
 import type { Env } from '../env';
@@ -254,9 +258,13 @@ export function createAuth(env: Env, db: Database, deps: AuthDeps = {}) {
         const created = ctx.context.newSession;
         if (!created) return;
         const { user } = created;
-        const newsletter = (ctx.body as { newsletter?: unknown } | undefined)?.newsletter === true;
+        const fields = ctx.body as { newsletter?: unknown; acceptTerms?: unknown } | undefined;
+        const newsletter = fields?.newsletter === true;
         const background = deps.waitUntil ?? ((promise: Promise<unknown>) => void promise);
         try {
+          // Consent record for the terms and privacy policy. Recorded when the form sends it; not
+          // required yet, because mobile builds before 1.0.0 (3) don't send it.
+          if (fields?.acceptTerms === true) await saveTermsAcceptance(db, user.id);
           if (newsletter) {
             await saveNewsletterChoice(db, user.id, true);
             background(

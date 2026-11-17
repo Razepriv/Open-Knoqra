@@ -31,7 +31,8 @@ export type IdPrefix =
   | 'sb'
   | 'ma'
   | 'mr'
-  | 'sr';
+  | 'sr'
+  | 'ac';
 
 /** `<prefix>_<32 hex>`: a UUIDv4 without dashes. */
 export function newId(prefix: IdPrefix): string {

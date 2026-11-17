@@ -20,7 +20,7 @@ All of Phase 1, personal communications:
 - **Numbers and usage:** sync, assign and buy numbers on your own provider account, the setup wizard, the usage page and daily reconciliation.
 - **Wallet:** an append-only ledger with warn and stop caps. It tracks your own provider spend: calls are estimated at a flat $0.01 a billed minute and reconciled against what the provider billed.
 - **Today:** the week grid, streak, focus timer, tasks, notifications and the command palette.
-- **Otto:** the assistant that drafts messages, writes contact briefs and summarizes what you missed, with every output labelled a draft and citing its sources. You connect your own model: an OpenAI-compatible API key today, and "Sign in with ChatGPT" later. The recommendation and personalization layer is the same in every edition.
+- **Otto:** the assistant that drafts messages, writes contact briefs and summarizes what you missed, with every output labelled a draft and citing its sources. You connect your own model: each workspace pastes its OpenAI API key in Settings (stored encrypted), or the server uses one OpenAI-compatible key for everyone. "Sign in with ChatGPT" is built behind a flag, for when OpenAI admits the app to its partner program. The recommendation and personalization layer is the same in every edition.
 - **Connectors:** connect any supported provider (Telnyx, recommended because it covers calls, SMS and WhatsApp, or Plivo).
 - **Self-host tooling:** `pnpm knoqra setup` and `pnpm knoqra deploy`, and the self-host license key check.
 

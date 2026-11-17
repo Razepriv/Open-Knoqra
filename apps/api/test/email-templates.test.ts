@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { latestPosts, parseFeed, resetFeedCache } from '../src/email/blog-feed';
 import { safeHref } from '../src/email/layout';
+import { TERMS_VERSION } from '../src/email/newsletter';
 import { passwordResetEmail, postsDigestEmail, welcomeEmail } from '../src/email/templates';
 import {
   listUnsubscribeHeaders,
@@ -283,6 +284,22 @@ async function welcomeTo(email: string) {
     return found;
   });
 }
+
+describe('terms acceptance at sign-up', () => {
+  it('records when and which version of the terms the user accepted', async () => {
+    const before = Date.now();
+    const { userId } = await signUpWith(uniqueEmail('terms'), { acceptTerms: true });
+    const row = await newsletterOf(userId);
+    expect(row?.termsAcceptedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(row?.termsVersion).toBe(TERMS_VERSION);
+  });
+
+  it('records nothing when the form does not send it (older mobile builds)', async () => {
+    const { userId } = await signUpWith(uniqueEmail('noterms'));
+    const row = await newsletterOf(userId);
+    expect(row?.termsAcceptedAt ?? null).toBeNull();
+  });
+});
 
 describe('sign-up mail and the newsletter choice', () => {
   it('sends a welcome email and stores no opt-in by default', async () => {

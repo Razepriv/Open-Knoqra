@@ -186,7 +186,7 @@ test('the challenge page keeps a safe next target through sign-in', async ({ pag
 
   await context.clearCookies();
   await page.goto('/sign-in?next=/settings');
-  await page.getByLabel('Email').fill(account.email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/two-factor/);
@@ -202,7 +202,9 @@ test('forgot password shows the same neutral confirmation for any address', asyn
   // Vite's dev server can reload the page once when it first optimises a new dependency, which
   // would clear the field: retry the fill-and-submit step as a whole.
   await expect(async () => {
-    await page.getByLabel('Email').fill(`nobody+${randomUUID()}@example.test`);
+    await page
+      .getByRole('textbox', { name: 'Email', exact: true })
+      .fill(`nobody+${randomUUID()}@example.test`);
     await page.getByRole('button', { name: 'Send reset link' }).click();
     await expect(page.getByText('If an account exists, a reset link is on its way.')).toBeVisible({
       timeout: 3000,

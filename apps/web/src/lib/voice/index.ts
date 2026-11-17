@@ -10,8 +10,10 @@ export { PlivoVoiceClient } from './plivo-voice-client';
 export { TelnyxVoiceClient } from './telnyx-voice-client';
 export {
   type AnswerInput,
+  type CallAudioStreams,
   type DialInput,
   type GetUserMedia,
+  NO_CALL_AUDIO,
   type VoiceClient,
   type VoiceCredential,
   VoiceError,

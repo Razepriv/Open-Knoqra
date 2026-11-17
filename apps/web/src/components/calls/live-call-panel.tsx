@@ -1,6 +1,7 @@
 import { Avatar, Button, Panel } from '@knoqra/ui';
 import { Grid3x3, Mic, MicOff, PhoneOff } from 'lucide-react';
 import { type CSSProperties, useState } from 'react';
+import { deskSlot } from '../../extensions';
 import { type Call, formatDuration, outcomeLabel } from '../../lib/calls';
 import { formatPhone, gradientFor } from '../../lib/contacts';
 import { callStateDot, callStateLine, elapsedSeconds, isLiveState } from '../../lib/dial';
@@ -72,6 +73,7 @@ export function LiveCallPanel({ call }: { call: Call }) {
   const live = isLiveState(call.state) && endedHere === null;
   const name = callName(call);
   const muted = session.mute.muted;
+  const LiveCallAudio = deskSlot('LiveCallAudio');
 
   const press = (key: string) => {
     setDigits((now) => `${now}${key}`.slice(-24));
@@ -112,6 +114,7 @@ export function LiveCallPanel({ call }: { call: Call }) {
         stoppedAt={endedHere}
         className="mt-[6px] mb-[2px] font-[family-name:var(--font-mono)] text-[60px] text-[color:var(--accent)] leading-none tracking-[-0.03em] [font-variant-numeric:tabular-nums]"
       />
+      {live && LiveCallAudio ? <LiveCallAudio call={call} /> : null}
       <p role="status" aria-live="polite" className="font-medium text-[15px] leading-[1.3]">
         {endedHere === null ? callStateLine(call.state, call.direction) : 'Call ended'}
       </p>

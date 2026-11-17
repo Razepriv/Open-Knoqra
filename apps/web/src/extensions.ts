@@ -1,7 +1,8 @@
 import type { RouteComponent } from '@tanstack/react-router';
 import type { ComponentType, ReactNode } from 'react';
 import type { Me } from './lib/api';
-import type { CallPreflight } from './lib/calls';
+import type { Call, CallPreflight } from './lib/calls';
+import type { TimelineEvent } from './lib/contact360';
 import type { UsageSummary } from './lib/usage';
 
 /** A page under the signed-in shell, added as a code-based route (extension-pages.ts). */
@@ -44,6 +45,17 @@ export interface DeskExtension {
    * platform path is not available, and `onCheck` looks for the new number now.
    */
   WhatsAppSignup?: ComponentType<{ fallback: ReactNode; onCheck: () => void; checking: boolean }>;
+  /**
+   * Inside the live call panel, under the timer, while the call is live here (`useCallSession`
+   * gives its audio streams). Renders nothing when there is nothing to show.
+   */
+  LiveCallAudio?: ComponentType<{ call: Call }>;
+  /** Under the live call panel on the Calls page, for the call in progress or just ended. */
+  CallScreenPanel?: ComponentType<{ call: Call }>;
+  /** Extra buttons on a call in Recents, before Call back. */
+  CallRowActions?: ComponentType<{ call: Call }>;
+  /** Extra lines at the end of a contact timeline entry (an action on the record it refers to). */
+  TimelineEntryExtra?: ComponentType<{ event: TimelineEvent }>;
 }
 
 /**

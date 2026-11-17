@@ -50,6 +50,11 @@ export type Applied =
       call: CallJson;
       wallet: WalletSummary | null;
       voicemail: VoicemailJson | null;
+      provider: string;
+      /** The provider's id for the call, once an event has bound one. */
+      providerCallId: string | null;
+      /** The stored state before and after this event, or null when it did not change. */
+      transition: { from: CallState; to: CallState } | null;
     };
 
 export const parked = (reason: string): Applied => ({ kind: 'parked', reason });
@@ -266,6 +271,9 @@ async function applyChanges(
     call: callJson,
     wallet,
     voicemail: vm === null ? null : { ...vm, contact: callJson.contact },
+    provider: row.provider,
+    providerCallId: row.providerCallId ?? (event.providerCallId || null),
+    transition: next === row.state ? null : { from: row.state, to: next },
   };
 }
 

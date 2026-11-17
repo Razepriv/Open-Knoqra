@@ -1,6 +1,7 @@
 import { Avatar, Button, Panel, Reveal } from '@knoqra/ui';
 import { PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 import { type KeyboardEvent, useId, useRef, useState } from 'react';
+import { deskSlot } from '../../extensions';
 import { useMe } from '../../lib/api';
 import {
   type Call,
@@ -166,6 +167,7 @@ function RecentRow({ call, now, meId }: { call: Call; now: Date; meId: string | 
   const number = remoteNumber(call);
   const inbound = call.direction === 'inbound';
   const Icon = inbound ? PhoneIncoming : PhoneOutgoing;
+  const CallRowActions = deskSlot('CallRowActions');
   return (
     <li
       className={`grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-[10px] ${rowSurface}`}
@@ -207,6 +209,7 @@ function RecentRow({ call, now, meId }: { call: Call; now: Date; meId: string | 
             Log outcome
           </button>
         ) : null}
+        {CallRowActions ? <CallRowActions call={call} /> : null}
         <button
           type="button"
           aria-label={`Call back ${name}`}

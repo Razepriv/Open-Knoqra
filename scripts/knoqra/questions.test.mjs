@@ -154,7 +154,7 @@ describe('runSetup', () => {
       TELNYX_PUBLIC_KEY: ['not-a-key', ''],
       RESEND_API_KEY: 're_resend_SECRET_0002',
       EMAIL_FROM: 'KNOQRA <no-reply@example.com>',
-      AI_PROVIDER: 'chatgpt',
+      AI_PROVIDER: 'none',
       KNOQRA_LICENSE_KEY: ['KNOQRA-LICENSE-2.abc.def', LICENSE_KEY],
     });
     const v = run.result;
@@ -164,8 +164,8 @@ describe('runSetup', () => {
     assert.match(run.output, /not a base64 key of 32 bytes/);
     assert.equal(v.RESEND_API_KEY, 're_resend_SECRET_0002');
     assert.equal(v.EMAIL_FROM, 'KNOQRA <no-reply@example.com>');
-    assert.equal(v.AI_PROVIDER, 'chatgpt');
-    assert.match(run.output, /coming in a later release.*mock/);
+    assert.equal(v.AI_PROVIDER, 'none');
+    assert.match(run.output, /connects its own OpenAI key/);
     assert.equal(v.KNOQRA_LICENSE_KEY, LICENSE_KEY);
     assert.match(run.output, /not a license key/);
     assert.match(run.output, /api\/license\/github\/start/);

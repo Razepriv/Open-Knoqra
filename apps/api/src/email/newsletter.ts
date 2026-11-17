@@ -31,6 +31,25 @@ export async function saveNewsletterChoice(
     });
 }
 
+/** The version of the terms and privacy policy shown at sign-up: their "last updated" date. */
+export const TERMS_VERSION = '2026-11-17';
+
+/** Records that the user accepted the terms and privacy policy, and which version. */
+export async function saveTermsAcceptance(
+  db: Database | Tx,
+  userId: string,
+  at: Date = new Date(),
+  version: string = TERMS_VERSION,
+): Promise<void> {
+  await db
+    .insert(userPrefs)
+    .values({ userId, termsAcceptedAt: at, termsVersion: version })
+    .onConflictDoUpdate({
+      target: userPrefs.userId,
+      set: { termsAcceptedAt: at, termsVersion: version, updatedAt: at },
+    });
+}
+
 /** Tells each extension about the change. Never throws: a mailing list being down must not fail the request. */
 export async function announceNewsletterChange(env: Env, change: NewsletterChange): Promise<void> {
   for (const extension of env.EXTENSIONS ?? []) {

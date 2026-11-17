@@ -831,6 +831,40 @@ describe('TelnyxProvider number purchase', () => {
     });
   });
 
+  it('attaches a messaging profile and a customer reference when given', async () => {
+    const { calls, fetchImpl } = stubFetch([
+      {
+        method: 'POST',
+        url: `${BASE}/number_orders`,
+        respond: fixtureResponse('number-order-created'),
+      },
+    ]);
+    await provider(fetchImpl).orderNumber({
+      e164: '+12025550150',
+      connectionId: 'conn-1',
+      messagingProfileId: 'mp-1',
+      customerReference: 'knoqra:org_1',
+    });
+    expect(calls[0]?.body).toEqual({
+      phone_numbers: [{ phone_number: '+12025550150' }],
+      connection_id: 'conn-1',
+      messaging_profile_id: 'mp-1',
+      customer_reference: 'knoqra:org_1',
+    });
+  });
+
+  it('quotes a Canadian number in Canada', async () => {
+    const { calls, fetchImpl } = stubFetch([
+      {
+        method: 'GET',
+        url: `${BASE}/available_phone_numbers?filter%5Bcountry_code%5D=CA&filter%5Bphone_number%5D%5Bcontains%5D=4165550150&filter%5Blimit%5D=10`,
+        respond: json(200, { data: [] }),
+      },
+    ]);
+    expect(await provider(fetchImpl).quoteNumber('+14165550150', 'CA')).toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+
   it('omits connection_id when null and maps success and failure statuses', async () => {
     for (const [status, mapped] of [
       ['success', 'completed'],

@@ -189,15 +189,20 @@ async function holdAndRecord(
     const total = quote.upfrontMicros + quote.monthlyMicros;
     const orderId = newId('no');
     await openWallet(tx, env, tenant.orgId);
-    const held = await reserve(tx, {
-      orgId: tenant.orgId,
-      amountMicros: total,
-      idempotencyKey: holdKey(input.idempotencyKey),
-      refType: 'number_order',
-      refId: orderId,
-      actorUserId: tenant.userId,
-    });
-    if ('refused' in held) throw new SpendRefused(held.refused);
+    // A free order (a number a plan includes) holds nothing: there is nothing to capture.
+    let reservationId: string | null = null;
+    if (total > 0) {
+      const held = await reserve(tx, {
+        orgId: tenant.orgId,
+        amountMicros: total,
+        idempotencyKey: holdKey(input.idempotencyKey),
+        refType: 'number_order',
+        refId: orderId,
+        actorUserId: tenant.userId,
+      });
+      if ('refused' in held) throw new SpendRefused(held.refused);
+      reservationId = held.entry.id;
+    }
     const providerDecision = await providerSpendDecision(tx, now);
     // Throwing rolls the transaction back, so the hold above is not kept.
     if (providerDecision.outcome === 'stop') throw new SpendRefused(providerDecision);
@@ -216,7 +221,7 @@ async function holdAndRecord(
           status: 'pending',
           upfrontMicros: quote.upfrontMicros,
           monthlyMicros: quote.monthlyMicros,
-          reservationId: held.entry.id,
+          reservationId,
           createdBy: tenant.userId,
         })
         .returning();
@@ -310,6 +315,12 @@ async function settleHold(
   key: string,
 ): Promise<OrderOutcome> {
   if (!answer.confirmed) return { status: 'pending', failureCode: answer.failureCode };
+  if (order.reservationId === null) {
+    // A free order: nothing held, so nothing to settle.
+    return answer.status === 'failed'
+      ? { status: 'failed', failureCode: answer.failureCode ?? GENERIC_FAILURE }
+      : { status: 'pending', failureCode: null };
+  }
   const entry = await settleReservation(tx, {
     orgId,
     reservationId: order.reservationId,
@@ -460,16 +471,19 @@ export async function completePendingOrders(
       .where(and(eq(phoneNumber.e164, order.e164), eq(phoneNumber.status, 'active')))
       .limit(1);
     if (!row) continue;
-    const entry = await settleReservation(tx, {
-      orgId,
-      reservationId: order.reservationId,
-      costMicros: order.upfrontMicros + order.monthlyMicros,
-      idempotencyKey: settleKey(order.idempotencyKey),
-      refType: 'number_order',
-      refId: order.id,
-    });
-    // The purchase path released this hold first: nothing was charged, so nothing completes.
-    if (entry.kind !== 'capture') continue;
+    // A free order holds nothing: it completes once its number is active.
+    if (order.reservationId !== null) {
+      const entry = await settleReservation(tx, {
+        orgId,
+        reservationId: order.reservationId,
+        costMicros: order.upfrontMicros + order.monthlyMicros,
+        idempotencyKey: settleKey(order.idempotencyKey),
+        refType: 'number_order',
+        refId: order.id,
+      });
+      // The purchase path released this hold first: nothing was charged, so nothing completes.
+      if (entry.kind !== 'capture') continue;
+    }
     const [flipped] = await tx
       .update(numberOrder)
       .set({ status: 'completed', failureCode: null })

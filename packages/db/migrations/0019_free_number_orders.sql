@@ -1,0 +1,2 @@
+ALTER TABLE "number_order" ALTER COLUMN "reservation_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "number_order" ADD CONSTRAINT "number_order_free_or_held" CHECK ("number_order"."reservation_id" is not null or ("number_order"."upfront_micros" = 0 and "number_order"."monthly_micros" = 0));

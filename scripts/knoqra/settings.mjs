@@ -8,7 +8,7 @@ export const APP_ROLE = 'knoqra_app';
 export const CONFIG_FILE_NAME = 'wrangler.selfhost.jsonc';
 export const LICENSE_START_URL = 'https://app.knoqra.app/api/license/github/start';
 export const CONNECTOR_NAMES = ['telnyx', 'plivo'];
-export const AI_PROVIDERS = ['mock', 'openai', 'chatgpt'];
+export const AI_PROVIDERS = ['mock', 'openai', 'none', 'chatgpt'];
 
 /** Settings whose values are never printed. */
 export const SECRET_KEYS = [

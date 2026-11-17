@@ -7,8 +7,11 @@ const fixture = fileURLToPath(new URL('./fixtures/contacts.csv', import.meta.url
 async function signUp(page: Page) {
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill('Ana Silva');
-  await page.getByLabel('Email').fill(`e2e+import${Date.now()}@example.test`);
+  await page
+    .getByRole('textbox', { name: 'Email', exact: true })
+    .fill(`e2e+import${Date.now()}@example.test`);
   await page.getByLabel('Password').fill('correct-horse-battery');
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(
     page.getByRole('heading', { name: /Good (morning|afternoon|evening), Ana/ }),
@@ -29,7 +32,7 @@ test('import wizard: upload, map, review, run and download the rejected rows', a
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue('0');
   await expect(page.getByLabel('Phone', { exact: true })).toHaveValue('1');
   await expect(page.getByLabel('Company', { exact: true })).toHaveValue('2');
-  await expect(page.getByLabel('Email', { exact: true })).toHaveValue('3');
+  await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toHaveValue('3');
   await expect(page.getByLabel('Job title', { exact: true })).toHaveValue('4');
   await expect(page.getByLabel('Time zone', { exact: true })).toHaveValue('5');
   await expect(page.getByLabel('Tags', { exact: true })).toHaveValue('6');

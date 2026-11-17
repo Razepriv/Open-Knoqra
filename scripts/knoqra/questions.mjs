@@ -316,11 +316,12 @@ async function aiStep(ctx) {
   values.AI_PROVIDER = await choose(ctx, {
     id: 'AI_PROVIDER',
     label: 'AI',
-    current: values.AI_PROVIDER || 'mock',
+    // `chatgpt` is an older answer: ChatGPT sign-in is now per workspace, so it reads as `none`.
+    current: values.AI_PROVIDER === 'chatgpt' ? 'none' : values.AI_PROVIDER || 'mock',
     choices: [
       { value: 'mock', label: 'No model: Otto writes simple, predictable drafts (no key needed)' },
-      { value: 'openai', label: 'An OpenAI-compatible API key' },
-      { value: 'chatgpt', label: 'ChatGPT sign-in: each user signs in with ChatGPT in the Desk' },
+      { value: 'openai', label: 'One OpenAI-compatible API key for every workspace' },
+      { value: 'none', label: 'None: each workspace connects its own OpenAI key in Settings' },
     ],
   });
   if (values.AI_PROVIDER === 'openai') {
@@ -341,9 +342,9 @@ async function aiStep(ctx) {
       normalize: (v) => v.replace(/\/+$/, ''),
       validate: (v) => (/^https:\/\/[^\s/]+/.test(v) ? null : 'Use an https:// URL.'),
     });
-    ui.ok('Otto will use that API.');
-  } else if (values.AI_PROVIDER === 'chatgpt') {
-    ui.warn('ChatGPT sign-in is coming in a later release. Until then Otto uses the mock.');
+    ui.ok('Otto will use that API. A workspace can still connect its own key in Settings.');
+  } else if (values.AI_PROVIDER === 'none') {
+    ui.ok('Each workspace pastes its own OpenAI key in Settings, Otto section.');
   } else {
     ui.ok('Otto will use the mock. Re-run setup any time to change it.');
   }

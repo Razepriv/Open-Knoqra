@@ -49,7 +49,8 @@ export const numberQuote = pgTable(
 
 /**
  * One purchase of a quoted number. The charge is a ledger reservation, captured or released when
- * the provider answers. The app role may only update the outcome columns (sql/rls.sql).
+ * the provider answers. A free order (both prices 0, for example a number a plan includes) holds
+ * nothing and has no reservation. The app role may only update the outcome columns (sql/rls.sql).
  */
 export const numberOrder = pgTable(
   'number_order',
@@ -68,7 +69,8 @@ export const numberOrder = pgTable(
     providerOrderId: text('provider_order_id'),
     upfrontMicros: bigint('upfront_micros', { mode: 'number' }).notNull(),
     monthlyMicros: bigint('monthly_micros', { mode: 'number' }).notNull(),
-    reservationId: text('reservation_id').notNull(),
+    /** Null only for a free order. */
+    reservationId: text('reservation_id'),
     failureCode: text('failure_code'),
     createdBy: text('created_by').notNull(),
     createdAt: createdAt(),
@@ -103,6 +105,10 @@ export const numberOrder = pgTable(
     check('number_order_upfront_check', sql`${table.upfrontMicros} >= 0`),
     check('number_order_monthly_check', sql`${table.monthlyMicros} >= 0`),
     check('number_order_organization_id_not_empty', sql`${table.organizationId} <> ''`),
+    check(
+      'number_order_free_or_held',
+      sql`${table.reservationId} is not null or (${table.upfrontMicros} = 0 and ${table.monthlyMicros} = 0)`,
+    ),
   ],
 );
 

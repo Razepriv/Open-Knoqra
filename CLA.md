@@ -1,8 +1,9 @@
 # KNOQRA Individual Contributor License Agreement
 
-Thank you for contributing to KNOQRA. This agreement is between you ("You") and KNOQRA, founded by
-Razeen Shaheed, of Chennai, India (registered address: [TBD: registered address]; registration
-number: [TBD: registration number]; contact: hello@knoqra.app), the owner of the KNOQRA project and
+Thank you for contributing to KNOQRA. This agreement is between you ("You") and Webverse Arena
+Solutions (OPC) Private Limited, the company that operates KNOQRA, founded by Razeen Shaheed, of
+Chennai, India (registered office: 47/21/8, Big Street, Chidambaram, Cuddalore, Tamil Nadu 608502,
+India; CIN: U62099TZ2024OPC030884; contact: hello@knoqra.app), the owner of the KNOQRA project and
 its repositories under github.com/Razepriv, including github.com/Razepriv/Open-Knoqra, and its
 successors and assigns (the "Project Owner"). It clarifies the terms under which You contribute and keeps the Project (as defined in Section 1) free to evolve,
 including to change its license. You keep the copyright in Your Contributions.

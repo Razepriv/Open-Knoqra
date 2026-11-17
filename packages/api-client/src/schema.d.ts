@@ -2195,6 +2195,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description Otto is not included in this plan: upgrade or connect your own key */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description No such contact in the active organization */
                 404: {
                     headers: {
@@ -2204,7 +2213,7 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description No active organization */
+                /** @description No active organization, or Otto is not connected to a model */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2301,7 +2310,16 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description No active organization */
+                /** @description Otto is not included in this plan: upgrade or connect your own key */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization, or Otto is not connected to a model */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2320,6 +2338,515 @@ export interface paths {
                     };
                 };
                 /** @description Otto is unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/otto/drafts/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Like POST /api/v1/otto/drafts, with the text streamed as Otto writes it */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateOttoDraft"];
+                };
+            };
+            responses: {
+                /** @description Server-sent events: `delta` events with `{ text }` pieces, then `done` with the stored OttoDraft, or `error` with `{ code, message }`. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Otto output with its sources */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OttoDraft"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Body failed validation */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Otto is not included in this plan: upgrade or connect your own key */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No such contact in the active organization */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization, or Otto is not connected to a model */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The contact is archived or merged */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Otto has reached today's limit */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Otto is unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/otto/digest/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Like POST /api/v1/otto/digest, with the text streamed as Otto writes it */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateOttoDigest"];
+                };
+            };
+            responses: {
+                /** @description Server-sent events: `delta` events with `{ text }` pieces, then `done` with the stored OttoDraft, or `error` with `{ code, message }`. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Otto digest with its sources */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OttoDraft"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Body failed validation */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Otto is not included in this plan: upgrade or connect your own key */
+                402: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization, or Otto is not connected to a model */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Otto has reached today's limit */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Otto is unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/otto/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How Otto reaches a model for this workspace, and today's use */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The connection status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OttoConnection"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Disconnect the workspace's own key or ChatGPT sign-in */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Disconnected */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OttoConnection"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can connect Otto */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/otto/connection/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Connect Otto with the workspace's own OpenAI API key. The key is never shown again. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveOttoKey"];
+                };
+            };
+            responses: {
+                /** @description Connected */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OttoConnection"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description Body failed validation, or OpenAI refused the key */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can connect Otto */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description OpenAI could not be reached, or keys cannot be stored on this server */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/otto/connection/chatgpt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start "Sign in with ChatGPT": the Desk opens the returned URL */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Where to send the browser */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["OttoChatGptStart"];
+                            error: null;
+                        };
+                    };
+                };
+                /** @description No valid session */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Only owners and admins can connect Otto */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description ChatGPT sign-in is not offered here */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No active organization */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Keys cannot be stored on this server */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -7612,7 +8139,7 @@ export interface components {
             data: null;
             error: {
                 /** @enum {string} */
-                code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid" | "invalid_password" | "sole_owner_with_members";
+                code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "ai_busy" | "otto_not_connected" | "otto_upgrade_required" | "invalid_api_key" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid" | "invalid_password" | "sole_owner_with_members";
                 message: string;
             };
         };
@@ -7687,7 +8214,7 @@ export interface components {
                 contactId: string | null;
                 error: {
                     /** @enum {string} */
-                    code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid" | "invalid_password" | "sole_owner_with_members";
+                    code: "unauthenticated" | "no_active_org" | "forbidden" | "invalid_phone" | "emergency_not_supported" | "duplicate_contact" | "not_found" | "invalid_signature" | "invalid_payload" | "validation_error" | "payload_too_large" | "internal_error" | "quota_exceeded" | "ai_unavailable" | "ai_busy" | "otto_not_connected" | "otto_upgrade_required" | "invalid_api_key" | "send_blocked" | "send_paused" | "template_required" | "duplicate_template" | "consent_reason_required" | "not_configured" | "voice_not_configured" | "call_blocked" | "needs_review" | "call_in_progress" | "spend_blocked" | "invalid_state" | "outcome_exists" | "number_not_owned" | "provider_auth" | "provider_unavailable" | "number_not_synced" | "credential_changed" | "rate_limited" | "quote_invalid" | "connector_conflict" | "rate_unavailable" | "license_required" | "license_invalid" | "invalid_password" | "sole_owner_with_members";
                     message: string;
                 } | null;
             }[];
@@ -7910,6 +8437,38 @@ export interface components {
             instruction?: string;
         };
         CreateOttoDigest: Record<string, never>;
+        OttoConnection: {
+            /**
+             * @description Where answers come from: own_key (the workspace OpenAI key), chatgpt (its ChatGPT plan), included (the plan includes Otto), instance (the server key), demo (no model: sample drafts), connect (nothing yet), upgrade (the plan does not include Otto).
+             * @enum {string}
+             */
+            mode: "own_key" | "chatgpt" | "included" | "instance" | "demo" | "connect" | "upgrade";
+            connection: {
+                /** @enum {string} */
+                kind: "api_key" | "chatgpt";
+                last4: string | null;
+                model: string;
+                /** Format: date-time */
+                updatedAt: string;
+            } | null;
+            plan: string | null;
+            upgradePath: string | null;
+            dailyLimit: number | null;
+            usedToday: number;
+            canManage: boolean;
+            /** @description Whether "Sign in with ChatGPT" is offered. */
+            chatgptSignIn: boolean;
+            /** @description Whether Otto answers with the plan's early-access model (shown as Early access). */
+            earlyAccess: boolean;
+        };
+        SaveOttoKey: {
+            apiKey: string;
+            model?: string;
+        };
+        OttoChatGptStart: {
+            /** Format: uri */
+            url: string;
+        };
         TodaySummary: {
             timeZone: string;
             today: string;

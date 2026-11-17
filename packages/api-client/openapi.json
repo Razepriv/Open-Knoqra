@@ -173,6 +173,10 @@
                   "internal_error",
                   "quota_exceeded",
                   "ai_unavailable",
+                  "ai_busy",
+                  "otto_not_connected",
+                  "otto_upgrade_required",
+                  "invalid_api_key",
                   "send_blocked",
                   "send_paused",
                   "template_required",
@@ -443,6 +447,10 @@
                         "internal_error",
                         "quota_exceeded",
                         "ai_unavailable",
+                        "ai_busy",
+                        "otto_not_connected",
+                        "otto_upgrade_required",
+                        "invalid_api_key",
                         "send_blocked",
                         "send_paused",
                         "template_required",
@@ -1193,6 +1201,96 @@
       "CreateOttoDigest": {
         "type": "object",
         "properties": {}
+      },
+      "OttoConnection": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["own_key", "chatgpt", "included", "instance", "demo", "connect", "upgrade"],
+            "description": "Where answers come from: own_key (the workspace OpenAI key), chatgpt (its ChatGPT plan), included (the plan includes Otto), instance (the server key), demo (no model: sample drafts), connect (nothing yet), upgrade (the plan does not include Otto)."
+          },
+          "connection": {
+            "type": ["object", "null"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["api_key", "chatgpt"]
+              },
+              "last4": {
+                "type": ["string", "null"]
+              },
+              "model": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["kind", "last4", "model", "updatedAt"]
+          },
+          "plan": {
+            "type": ["string", "null"]
+          },
+          "upgradePath": {
+            "type": ["string", "null"]
+          },
+          "dailyLimit": {
+            "type": ["integer", "null"]
+          },
+          "usedToday": {
+            "type": "integer"
+          },
+          "canManage": {
+            "type": "boolean"
+          },
+          "chatgptSignIn": {
+            "type": "boolean",
+            "description": "Whether \"Sign in with ChatGPT\" is offered."
+          },
+          "earlyAccess": {
+            "type": "boolean",
+            "description": "Whether Otto answers with the plan's early-access model (shown as Early access)."
+          }
+        },
+        "required": [
+          "mode",
+          "connection",
+          "plan",
+          "upgradePath",
+          "dailyLimit",
+          "usedToday",
+          "canManage",
+          "chatgptSignIn",
+          "earlyAccess"
+        ]
+      },
+      "SaveOttoKey": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 512,
+            "pattern": "^\\S+$"
+          },
+          "model": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+          }
+        },
+        "required": ["apiKey"]
+      },
+      "OttoChatGptStart": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["url"]
       },
       "TodaySummary": {
         "type": "object",
@@ -6510,6 +6608,16 @@
               }
             }
           },
+          "402": {
+            "description": "Otto is not included in this plan: upgrade or connect your own key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "No such contact in the active organization",
             "content": {
@@ -6521,7 +6629,7 @@
             }
           },
           "409": {
-            "description": "No active organization",
+            "description": "No active organization, or Otto is not connected to a model",
             "content": {
               "application/json": {
                 "schema": {
@@ -6622,8 +6730,18 @@
               }
             }
           },
+          "402": {
+            "description": "Otto is not included in this plan: upgrade or connect your own key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "409": {
-            "description": "No active organization",
+            "description": "No active organization, or Otto is not connected to a model",
             "content": {
               "application/json": {
                 "schema": {
@@ -6644,6 +6762,536 @@
           },
           "503": {
             "description": "Otto is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/otto/drafts/stream": {
+      "post": {
+        "tags": ["otto"],
+        "summary": "Like POST /api/v1/otto/drafts, with the text streamed as Otto writes it",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOttoDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server-sent events: `delta` events with `{ text }` pieces, then `done` with the stored OttoDraft, or `error` with `{ code, message }`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Otto output with its sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OttoDraft"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Otto is not included in this plan: upgrade or connect your own key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such contact in the active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization, or Otto is not connected to a model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The contact is archived or merged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Otto has reached today's limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Otto is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/otto/digest/stream": {
+      "post": {
+        "tags": ["otto"],
+        "summary": "Like POST /api/v1/otto/digest, with the text streamed as Otto writes it",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOttoDigest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server-sent events: `delta` events with `{ text }` pieces, then `done` with the stored OttoDraft, or `error` with `{ code, message }`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Otto digest with its sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OttoDraft"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Otto is not included in this plan: upgrade or connect your own key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization, or Otto is not connected to a model",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Otto has reached today's limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Otto is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/otto/connection": {
+      "get": {
+        "tags": ["otto"],
+        "summary": "How Otto reaches a model for this workspace, and today's use",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The connection status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OttoConnection"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["otto"],
+        "summary": "Disconnect the workspace's own key or ChatGPT sign-in",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disconnected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OttoConnection"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can connect Otto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/otto/connection/key": {
+      "put": {
+        "tags": ["otto"],
+        "summary": "Connect Otto with the workspace's own OpenAI API key. The key is never shown again.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOttoKey"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OttoConnection"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body failed validation, or OpenAI refused the key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can connect Otto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "OpenAI could not be reached, or keys cannot be stored on this server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/otto/connection/chatgpt": {
+      "post": {
+        "tags": ["otto"],
+        "summary": "Start \"Sign in with ChatGPT\": the Desk opens the returned URL",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where to send the browser",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/OttoChatGptStart"
+                    },
+                    "error": {
+                      "type": "null"
+                    }
+                  },
+                  "required": ["data", "error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners and admins can connect Otto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ChatGPT sign-in is not offered here",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Keys cannot be stored on this server",
             "content": {
               "application/json": {
                 "schema": {

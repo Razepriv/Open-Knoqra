@@ -5,17 +5,19 @@ import { FileText, History, PenLine } from 'lucide-react';
 import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import {
   citationHref,
+  needsOttoSetup,
   type OttoCitation,
   type OttoDraft,
   ottoErrorMessage,
   ottoEyebrow,
   ottoMood,
-  useOttoDigest,
-  useOttoDraft,
+  streamOtto,
+  useOttoConnection,
 } from '../../lib/otto';
 import { useTasks } from '../../lib/tasks';
 import { focusRing } from '../../lib/ui-classes';
 import { ContactPicker, type PickedContact } from '../contact-picker';
+import { EarlyAccessTag } from '../otto/early-access-tag';
 import { OttoHead } from '../otto/otto-head';
 import { OttoResultSkeleton } from '../skeletons/today-skeleton';
 import { UP_NEXT_SHOWN } from './up-next-widget';
@@ -125,11 +127,13 @@ export function OttoWidget({ controls, notify }: WidgetSlotProps) {
   // Until someone picks (or clears) a contact, Otto follows the first one up next.
   const [picked, setPicked] = useState<PickedContact | null | undefined>(undefined);
   const contact = picked === undefined ? upNextContact : picked;
-  const draft = useOttoDraft();
-  const digest = useOttoDigest();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<OttoDraft | null>(null);
+  // The answer so far, while Otto is still writing it.
+  const [live, setLive] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [setupNeeded, setSetupNeeded] = useState(false);
+  const earlyAccess = useOttoConnection().data?.earlyAccess === true;
   const hintId = useId();
   const actions = useRef<HTMLDivElement>(null);
   const focusAfter = useRef<FocusAfter | null>(null);
@@ -143,31 +147,38 @@ export function OttoWidget({ controls, notify }: WidgetSlotProps) {
     placeFocus(actions.current, target);
   });
 
-  async function run(origin: HTMLButtonElement, request: () => Promise<OttoDraft>) {
+  async function run(
+    origin: HTMLButtonElement,
+    request: (onText: (delta: string) => void) => Promise<OttoDraft>,
+  ) {
     setError(null);
+    setSetupNeeded(false);
     setResult(null);
+    setLive('');
     setBusy(true);
     let next: OttoDraft | null = null;
     let message: string | null = null;
+    let setup = false;
     try {
-      next = await request();
+      next = await request((delta) => setLive((text) => text + delta));
     } catch (failure) {
-      message = ottoErrorMessage(failure);
+      message = ottoErrorMessage(failure, earlyAccess);
+      setup = needsOttoSetup(failure);
     }
     focusAfter.current = origin;
     setResult(next);
+    setLive('');
     setError(message);
+    setSetupNeeded(setup);
     setBusy(false);
   }
 
   function ask(kind: 'draft' | 'brief', origin: HTMLButtonElement) {
     if (!contact) return;
     const contactId = contact.id;
-    void run(origin, () =>
-      draft.mutateAsync(
-        kind === 'draft' ? { kind, contactId, channel: 'sms' } : { kind, contactId },
-      ),
-    );
+    const body =
+      kind === 'draft' ? { kind, contactId, channel: 'sms' as const } : { kind, contactId };
+    void run(origin, (onText) => streamOtto('/api/v1/otto/drafts/stream', body, onText));
   }
 
   function discard() {
@@ -189,7 +200,12 @@ export function OttoWidget({ controls, notify }: WidgetSlotProps) {
       widget="otto"
       label={LABEL}
       controls={controls}
-      aside={<span className={eyebrowClass('light')}>OTTO · DRAFTS ONLY · METERED</span>}
+      aside={
+        <span className="inline-flex flex-wrap items-center justify-end gap-[6px]">
+          {earlyAccess ? <EarlyAccessTag /> : null}
+          <span className={eyebrowClass('light')}>OTTO · DRAFTS ONLY · METERED</span>
+        </span>
+      }
     >
       <div className="-mt-1 flex flex-col items-center gap-3 text-center">
         <OttoHead mood={ottoMood({ pending: busy, hasResult: result !== null })} size={HEAD_SIZE} />
@@ -222,7 +238,11 @@ export function OttoWidget({ controls, notify }: WidgetSlotProps) {
         <button
           type="button"
           disabled={busy}
-          onClick={(event) => void run(event.currentTarget, () => digest.mutateAsync())}
+          onClick={(event) =>
+            void run(event.currentTarget, (onText) =>
+              streamOtto('/api/v1/otto/digest/stream', {}, onText),
+            )
+          }
           className={pill}
         >
           <History size={13} strokeWidth={1.75} aria-hidden="true" />
@@ -236,16 +256,34 @@ export function OttoWidget({ controls, notify }: WidgetSlotProps) {
       )}
       {error ? (
         <p role="alert" className="text-[13px] text-[color:var(--danger-text)] leading-[1.45]">
-          {error}
+          {error}{' '}
+          {setupNeeded ? (
+            <Link
+              to="/settings"
+              hash="otto"
+              className={`text-[color:var(--ink)] underline underline-offset-2 ${focusRing}`}
+            >
+              Open Settings
+            </Link>
+          ) : null}
         </p>
       ) : null}
       <p role="status" className="sr-only">
         {announcement}
       </p>
       {busy || result ? (
-        <Reveal loading={busy}>
+        <Reveal loading={busy && live === ''}>
           {result ? (
             <ResultCard result={result} onCopy={() => void copy(result.text)} onDiscard={discard} />
+          ) : live ? (
+            <article
+              aria-label="Otto is writing"
+              aria-busy="true"
+              className="flex flex-col gap-2 rounded-[16px] bg-[color:var(--cell)] px-[14px] py-3"
+            >
+              <span className={`${mono} leading-none`}>WRITING…</span>
+              <p className="whitespace-pre-line break-words text-[13px] leading-[1.45]">{live}</p>
+            </article>
           ) : (
             <OttoResultSkeleton label="Otto is thinking" />
           )}

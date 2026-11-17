@@ -25,8 +25,10 @@ import { isLiveState } from '../../lib/dial';
 import { hangupCall } from '../../lib/hangup';
 import type { RealtimeStatus } from '../../lib/realtime';
 import {
+  type CallAudioStreams,
   createVoiceClient,
   type GetUserMedia,
+  NO_CALL_AUDIO,
   type VoiceClient,
   VoiceError,
   type VoiceProvider,
@@ -81,6 +83,11 @@ export interface CallSessionValue {
   answer(callId: string): Promise<CallSessionError | null>;
   mute: { muted: boolean; toggle(): void };
   sendDigits(digits: string): void;
+  /**
+   * The live call's microphone and far-side audio streams, for level meters. Read it when needed
+   * (it is not state): the streams appear a moment after the call connects.
+   */
+  audioStreams(): CallAudioStreams;
   error: CallSessionError | null;
   clearError(): void;
   /** Forgets a call that has ended, so the Calls page goes back to the dialer and recents. */
@@ -475,6 +482,11 @@ export function CallSessionProvider({
     held.current?.client.sendDigits(digits);
   }, []);
 
+  const audioStreams = useCallback(
+    (): CallAudioStreams => held.current?.client.audioStreams?.() ?? NO_CALL_AUDIO,
+    [],
+  );
+
   const clearError = useCallback(() => setError(null), []);
   const closeOutcome = useCallback(() => setOutcomeId(null), []);
   const openOutcome = useCallback((callId: string) => setOutcomeId(callId), []);
@@ -496,6 +508,7 @@ export function CallSessionProvider({
       answer,
       mute: { muted, toggle: toggleMute },
       sendDigits,
+      audioStreams,
       error,
       clearError,
       dismiss,
@@ -517,6 +530,7 @@ export function CallSessionProvider({
       muted,
       toggleMute,
       sendDigits,
+      audioStreams,
       error,
       clearError,
       dismiss,

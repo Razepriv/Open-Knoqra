@@ -5,6 +5,7 @@ import { OutageState } from '../../components/outage';
 import { AboutSection } from '../../components/settings/about-section';
 import { ConnectorsSection } from '../../components/settings/connectors-section';
 import { DeleteAccountSection } from '../../components/settings/delete-account-section';
+import { OttoSection } from '../../components/settings/otto-section';
 import {
   PREFERENCES_SECTION,
   PreferencesSection,
@@ -102,6 +103,7 @@ function Settings() {
               {me.data ? <ConnectorsSection me={me.data} /> : <VoiceSectionSkeleton />}
             </Reveal>
           )}
+          {loadFailed(me) ? null : <OttoSection />}
           {ExtraSections && me.data ? <ExtraSections me={me.data} /> : null}
           <DeleteAccountSection />
         </div>

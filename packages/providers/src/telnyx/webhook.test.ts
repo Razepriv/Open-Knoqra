@@ -135,10 +135,15 @@ describe('TelnyxWebhookAdapter.parse', () => {
     expect(out.value.body).toEqual(fixtureJson('call-answered'));
   });
 
-  it('ignores a well-formed event it does not model', () => {
-    expect(adapter().parse(fixture('call-dtmf-received'))).toEqual({
+  it('ignores a well-formed event it does not model, passing its body on for extensions', () => {
+    const bytes = fixture('call-dtmf-received');
+    expect(adapter().parse(bytes)).toEqual({
       ok: true,
-      value: { kind: 'ignored', eventType: 'call.dtmf.received' },
+      value: {
+        kind: 'ignored',
+        eventType: 'call.dtmf.received',
+        body: JSON.parse(new TextDecoder().decode(bytes)),
+      },
     });
   });
 

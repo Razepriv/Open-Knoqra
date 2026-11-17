@@ -101,7 +101,7 @@ Never commit `.dev.vars`, `.env.local` or any real secret. Password-reset links 
 
 ## Otto and the mock AI provider
 
-Otto runs on `MockAiProvider`, a deterministic stand-in that needs no key and no network. The `AI_PROVIDER` variable selects the provider: unset or `mock` uses the mock, and any other value is not configured yet, so the Otto routes answer 500 until a real adapter is wired in `apps/api/src/otto/provider.ts`. You do not need to set it locally. See [what a real provider needs](architecture.md#what-a-real-ai-provider-needs).
+Locally Otto runs on `MockAiProvider`, a deterministic stand-in that needs no key and no network: `AI_PROVIDER` unset means the mock in development and tests. To try a real model, paste an OpenAI API key in Settings → Otto (it is checked with OpenAI and stored encrypted with `CREDENTIALS_MASTER_KEY`), or set `AI_PROVIDER=openai` and `AI_API_KEY` in `apps/api/.dev.vars` for every workspace. `AI_PROVIDER=none` shows the "connect" state. See [Otto and AI metering](architecture.md#otto-and-ai-metering).
 
 ## Database
 

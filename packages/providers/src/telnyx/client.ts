@@ -6,6 +6,7 @@ import type {
   AvailableNumber,
   BalanceProvider,
   DateRange,
+  NumberOrderInput,
   NumberOrderResult,
   NumberPurchaseProvider,
   NumberReleaseProvider,
@@ -182,11 +183,11 @@ export class TelnyxProvider
     return this.readAvailable(`/available_phone_numbers?${query(pairs)}`);
   }
 
-  async quoteNumber(e164: string): Promise<AvailableNumber | null> {
+  async quoteNumber(e164: string, country: 'US' | 'CA' = 'US'): Promise<AvailableNumber | null> {
     assertUsE164(e164);
     const found = await this.readAvailable(
       `/available_phone_numbers?${query([
-        ['filter[country_code]', 'US'],
+        ['filter[country_code]', country],
         ['filter[phone_number][contains]', e164.slice(2)],
         ['filter[limit]', QUOTE_LOOKUP_LIMIT],
       ])}`,
@@ -194,13 +195,12 @@ export class TelnyxProvider
     return found.find((n) => n.e164 === e164) ?? null;
   }
 
-  async orderNumber(input: {
-    e164: string;
-    connectionId: string | null;
-  }): Promise<NumberOrderResult> {
+  async orderNumber(input: NumberOrderInput): Promise<NumberOrderResult> {
     assertUsE164(input.e164);
     const body: Record<string, unknown> = { phone_numbers: [{ phone_number: input.e164 }] };
     if (input.connectionId !== null) body.connection_id = input.connectionId;
+    if (input.messagingProfileId) body.messaging_profile_id = input.messagingProfileId;
+    if (input.customerReference) body.customer_reference = input.customerReference;
     const res = await this.post('/number_orders', body);
     const { data } = await this.readJson(res, orderSchema);
     return {

@@ -15,15 +15,16 @@ export function newAccount(): Account {
 export async function signUp(page: Page, account: Account, name = 'Ana Silva') {
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill(name);
-  await page.getByLabel('Email').fill(account.email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email);
   await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).not.toHaveURL(/sign-up/);
 }
 
 export async function signIn(page: Page, account: Account) {
   await page.goto('/sign-in');
-  await page.getByLabel('Email').fill(account.email);
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(account.email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }

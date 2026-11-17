@@ -5,7 +5,7 @@
 > particular how far the AGPL lets a project stop forks from rebranding) need a professional
 > opinion. Text in `[TBD: ...]` is a placeholder for the project owner to fill in.
 
-Last updated: 2026-11-15.
+Last updated: 2026-11-17.
 
 KNOQRA's source code is open source under the [GNU AGPL v3](LICENSE), with the
 [additional terms](ADDITIONAL-TERMS.md) that section 7 of that license allows. The KNOQRA name,
@@ -20,10 +20,10 @@ another brand, or remove its branding or the "Powered by KNOQRA" attribution, wi
 
 | | |
 | --- | --- |
-| Owner | KNOQRA, founded by Razeen Shaheed |
+| Owner | Webverse Arena Solutions (OPC) Private Limited, the company that operates KNOQRA, founded by Razeen Shaheed |
 | Location | Chennai, India |
-| Registered address | [TBD: registered address] |
-| Registration number | [TBD: registration number] |
+| Registered address | 47/21/8, Big Street, Chidambaram, Cuddalore, Tamil Nadu 608502, India |
+| Registration number | CIN U62099TZ2024OPC030884 |
 | Contact | [hello@knoqra.app](mailto:hello@knoqra.app) |
 | Website | [knoqra.app](https://knoqra.app) |
 | GitHub | [github.com/Razepriv](https://github.com/Razepriv) |
@@ -31,8 +31,9 @@ another brand, or remove its branding or the "Powered by KNOQRA" attribution, wi
 
 ## What this policy covers
 
-The KNOQRA brand ("the KNOQRA Marks") is owned by KNOQRA, founded by Razeen Shaheed, of Chennai,
-India ("we" or "us"; details under [Who we are](#who-we-are)). It
+The KNOQRA brand ("the KNOQRA Marks") is owned by Webverse Arena Solutions (OPC) Private Limited,
+the company that operates KNOQRA, founded by Razeen Shaheed, of Chennai, India ("we" or "us";
+details under [Who we are](#who-we-are)). It
 includes:
 
 - the name **KNOQRA**, in any capitalization or styling;

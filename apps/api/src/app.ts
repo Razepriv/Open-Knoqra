@@ -41,6 +41,7 @@ import { notifications } from './routes/notifications';
 import { numberPurchase } from './routes/number-purchase';
 import { numbers } from './routes/numbers';
 import { otto } from './routes/otto';
+import { ottoConnectionRoutes } from './routes/otto-connection';
 import { plivoAnswer } from './routes/plivo-answer';
 import { prefs } from './routes/prefs';
 import { REALTIME_PATH, realtime, realtimeGuard } from './routes/realtime';
@@ -163,6 +164,8 @@ export function createApp(extensions: readonly ApiExtension[] = []): OpenAPIHono
   app.on('POST', '/api/v1/voice/token', rateLimit(RULES.voice_token));
   app.on('DELETE', '/api/v1/me', rateLimit(RULES.account_delete));
   app.on('POST', '/api/v1/conversations/:id/messages', rateLimit(RULES.message_send));
+  // Extension guards on core session routes: after the limits above, before the routes below.
+  for (const extension of extensions) extension.sessionGuards?.(app);
   app.route('/', me);
   app.route('/', licenseRoutes(licenseChecker));
   app.route('/', prefs);
@@ -174,6 +177,7 @@ export function createApp(extensions: readonly ApiExtension[] = []): OpenAPIHono
   app.route('/', tasks);
   app.route('/', notifications);
   app.route('/', otto);
+  app.route('/', ottoConnectionRoutes());
   app.route('/', today);
   app.route('/', todayPrefs);
   app.route('/', messagingSenders);

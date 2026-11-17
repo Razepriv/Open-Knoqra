@@ -37,8 +37,9 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill('Ana Silva');
-  await page.getByLabel('Email').fill(uniqueEmail('a11y'));
+  await page.getByRole('textbox', { name: 'Email', exact: true }).fill(uniqueEmail('a11y'));
   await page.getByLabel('Password').fill(TEST_PASSWORD);
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible({ timeout: 60_000 });
   const seed = await seedWorkspace(page.request);
@@ -205,8 +206,11 @@ for (const theme of THEMES) {
     // Its own account: the results step creates contacts.
     await page.goto('/sign-up');
     await page.getByLabel('Name').fill('Ana Silva');
-    await page.getByLabel('Email').fill(uniqueEmail('a11y-import'));
+    await page
+      .getByRole('textbox', { name: 'Email', exact: true })
+      .fill(uniqueEmail('a11y-import'));
     await page.getByLabel('Password').fill(TEST_PASSWORD);
+    await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
     await page.getByRole('button', { name: 'Create account' }).click();
     await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible({
       timeout: 60_000,
@@ -248,8 +252,11 @@ for (const theme of THEMES) {
     try {
       await page.goto('/sign-up');
       await page.getByLabel('Name').fill('Ana Silva');
-      await page.getByLabel('Email').fill(uniqueEmail('a11y-setup'));
+      await page
+        .getByRole('textbox', { name: 'Email', exact: true })
+        .fill(uniqueEmail('a11y-setup'));
       await page.getByLabel('Password').fill(TEST_PASSWORD);
+      await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
       await page.getByRole('button', { name: 'Create account' }).click();
       await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible({
         timeout: 60_000,

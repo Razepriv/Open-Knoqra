@@ -6,8 +6,11 @@ const fixture = fileURLToPath(new URL('./fixtures/contacts.csv', import.meta.url
 async function signUp(page: Page) {
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill('Ana Silva');
-  await page.getByLabel('Email').fill(`e2e+robust${Date.now()}@example.test`);
+  await page
+    .getByRole('textbox', { name: 'Email', exact: true })
+    .fill(`e2e+robust${Date.now()}@example.test`);
   await page.getByLabel('Password').fill('correct-horse-battery');
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(
     page.getByRole('heading', { name: /Good (morning|afternoon|evening), Ana/ }),
@@ -121,7 +124,7 @@ test('First Name and Last Name columns are joined into the name', async ({ page 
 test('mapping one column to two fields shows a warning', async ({ page }) => {
   await signUp(page);
   await upload(page, fixture);
-  await page.getByLabel('Email', { exact: true }).selectOption({ label: 'Name' });
+  await page.getByRole('textbox', { name: 'Email', exact: true }).selectOption({ label: 'Name' });
   await expect(
     page.getByRole('status').filter({ hasText: 'is used for Name and Email' }),
   ).toBeVisible();

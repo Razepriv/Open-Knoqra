@@ -120,6 +120,27 @@
       "when": 1794807805505,
       "tag": "0016_messaging_media",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794863575507,
+      "tag": "0017_terms_acceptance",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794883366326,
+      "tag": "0018_otto_connection",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794890662581,
+      "tag": "0019_free_number_orders",
+      "breakpoints": true
     }
   ]
 }

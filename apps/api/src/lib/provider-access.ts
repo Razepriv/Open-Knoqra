@@ -37,7 +37,12 @@ export type ProviderAccess =
 
 type AccessEnv = Pick<
   Env,
-  'PROVIDER' | 'APP_ENV' | 'FAKE_WEBHOOK_SECRET' | 'CREDENTIALS_MASTER_KEY' | 'API_PUBLIC_ORIGIN'
+  | 'PROVIDER'
+  | 'APP_ENV'
+  | 'FAKE_WEBHOOK_SECRET'
+  | 'CREDENTIALS_MASTER_KEY'
+  | 'API_PUBLIC_ORIGIN'
+  | 'EXTENSIONS'
 >;
 
 const TERMINAL_STATES = ['completed', 'failed', 'busy', 'no_answer', 'canceled'] as const;
@@ -112,14 +117,31 @@ async function fakeOrderedNumbers(tx: Tx): Promise<string[]> {
 }
 
 /**
- * The provider handle for an organization. A connection whose secret cannot be opened (no or wrong
- * master key) is `none`, logged by organization id only: never a key, never a ciphertext.
+ * The provider handle for an organization, as each extension's `providerAccess` adapts it. A
+ * connection whose secret cannot be opened (no or wrong master key) is `none`, logged by
+ * organization id only: never a key, never a ciphertext.
  */
 export async function openProviderAccess(
   tx: Tx,
   env: AccessEnv,
   orgId: string,
   opts: { fetch?: typeof fetch; fakeBalanceMicros?: number } = {},
+): Promise<ProviderAccess> {
+  let access = await openCoreAccess(tx, env, orgId, opts);
+  for (const extension of env.EXTENSIONS ?? []) {
+    if (!extension.providerAccess) continue;
+    access = await extension.providerAccess(tx, env as Env, orgId, access, {
+      ...(opts.fetch ? { fetch: opts.fetch } : {}),
+    });
+  }
+  return access;
+}
+
+async function openCoreAccess(
+  tx: Tx,
+  env: AccessEnv,
+  orgId: string,
+  opts: { fetch?: typeof fetch; fakeBalanceMicros?: number },
 ): Promise<ProviderAccess> {
   const choice = await loadVoiceChoice(tx, env);
   if (choice.kind === 'none') return { kind: 'none' };

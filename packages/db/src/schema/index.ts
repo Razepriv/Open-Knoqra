@@ -1,3 +1,4 @@
+export * from './ai-credential';
 export * from './audit';
 export * from './auth';
 export * from './contact';

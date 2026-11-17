@@ -106,7 +106,7 @@ export class TelnyxWebhookAdapter implements WebhookAdapter, EventNormalizer {
       if (message === null) return ok({ kind: 'ignored', eventType });
       return ok({ kind: 'event', event: messageEvent(message), body: json });
     }
-    if (!isModeled(eventType)) return ok({ kind: 'ignored', eventType });
+    if (!isModeled(eventType)) return ok({ kind: 'ignored', eventType, body: json });
     const call = parseCallPayload(payload);
     if (call === null) return err('invalid_payload');
     return ok({

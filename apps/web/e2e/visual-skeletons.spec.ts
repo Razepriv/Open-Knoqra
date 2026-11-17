@@ -69,8 +69,11 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await page.goto('/sign-up');
   await page.getByLabel('Name').fill('Ana Silva');
-  await page.getByLabel('Email').fill(uniqueEmail('visual-skeleton'));
+  await page
+    .getByRole('textbox', { name: 'Email', exact: true })
+    .fill(uniqueEmail('visual-skeleton'));
   await page.getByLabel('Password').fill(TEST_PASSWORD);
+  await page.getByRole('checkbox', { name: /I agree to the Terms/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible({ timeout: 60_000 });
   fullId = (await seedWorkspace(page.request)).full;

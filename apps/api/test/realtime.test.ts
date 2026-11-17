@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../src/env';
 import { publish, type RealtimeMessage } from '../src/lib/realtime';
-import { api, BASE, get, signUp, uniqueEmail } from './helpers';
+import { api, BASE, get, signUp, signUpTeammate, uniqueEmail } from './helpers';
 
 type Envelope<T> = { data: T | null; error: { code: string; message: string } | null };
 
@@ -124,6 +124,27 @@ describe('GET /api/v1/realtime', () => {
     expect(JSON.parse(await other.next())).toEqual(marker);
 
     for (const c of [first, second, other]) c.ws.close(1000, 'done');
+  });
+
+  it('sends to one member only when the frame names a user', async () => {
+    const cookie = await signUp(uniqueEmail('rt-user'), 'Realtime User');
+    const org = await orgOf(cookie);
+    const ownerId = (
+      (await (await get('/api/v1/me', cookie)).json()) as Envelope<{ user: { id: string } }>
+    ).data?.user.id as string;
+    const mate = await signUpTeammate(org);
+    const owner = await connect(cookie);
+    const teammate = await connect(mate.cookie);
+
+    const message: RealtimeMessage = { type: 'ext.test', data: { private: true } };
+    expect(await orgStub(org).broadcast(message, ownerId)).toBe(1);
+    expect(JSON.parse(await owner.next())).toEqual(message);
+
+    // The teammate's first frame is the next org-wide one: the private frame never reached it.
+    const marker: RealtimeMessage = { type: 'wallet.updated', data: { marker: true } };
+    expect(await orgStub(org).broadcast(marker)).toBe(2);
+    expect(JSON.parse(await teammate.next())).toEqual(marker);
+    for (const c of [owner, teammate]) c.ws.close(1000, 'done');
   });
 
   it('ignores client messages other than ping', async () => {

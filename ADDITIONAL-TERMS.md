@@ -5,8 +5,9 @@
 
 KNOQRA is licensed under the GNU Affero General Public License, version 3 only. The license text
 is in [LICENSE](LICENSE), unchanged. Section 7 of that license lets the copyright holder add
-certain kinds of terms. KNOQRA, founded by Razeen Shaheed, of Chennai, India (registered address:
-[TBD: registered address]; registration number: [TBD: registration number]; contact:
+certain kinds of terms. Webverse Arena Solutions (OPC) Private Limited, the company that operates
+KNOQRA, founded by Razeen Shaheed, of Chennai, India (registered office: 47/21/8, Big Street,
+Chidambaram, Cuddalore, Tamil Nadu 608502, India; CIN: U62099TZ2024OPC030884; contact:
 [hello@knoqra.app](mailto:hello@knoqra.app)), as copyright holder of KNOQRA and licensee of
 contributions under the [CLA](CLA.md), adds the terms below to all of KNOQRA's material. They
 are part of the license for that material, and they apply to every copy and every modified

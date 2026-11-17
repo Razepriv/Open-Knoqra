@@ -15,17 +15,27 @@ export type RealtimeMessage =
   | { type: 'voicemail.created'; data: unknown }
   | { type: 'message.updated'; data: { conversationId: string; message: unknown } }
   | { type: 'conversation.updated'; data: { conversationId: string } }
-  | { type: 'channels.updated'; data: Record<string, never> };
+  | { type: 'channels.updated'; data: Record<string, never> }
+  /**
+   * A frame an edition's extension sends (`ext.<name>`). The core Desk hands it to the listeners
+   * the extension registered (apps/web/src/lib/realtime.ts) and does nothing else with it.
+   */
+  | { type: `ext.${string}`; data: unknown };
 
 /**
- * Sends `message` to every socket connected for the organization. Best effort: realtime is a
- * notification channel, never the source of truth, so a failure is logged (org id only, never the
- * payload) and swallowed.
+ * Sends `message` to every socket connected for the organization, or with `userId` only to that
+ * member's sockets. Best effort: realtime is a notification channel, never the source of truth,
+ * so a failure is logged (org id only, never the payload) and swallowed.
  */
-export async function publish(env: Env, orgId: string, message: RealtimeMessage): Promise<void> {
+export async function publish(
+  env: Env,
+  orgId: string,
+  message: RealtimeMessage,
+  opts: { userId?: string } = {},
+): Promise<void> {
   try {
     const stub = env.ORG_REALTIME.get(env.ORG_REALTIME.idFromName(orgId));
-    await stub.broadcast(message);
+    await stub.broadcast(message, opts.userId);
   } catch (error) {
     logger.error('realtime.publish_failed', { orgId, error });
   }

@@ -30,6 +30,42 @@ export function realtimeUrl(location: { protocol: string; host: string }): strin
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/**
+ * What an edition's extension hears from the socket: its own `ext.<name>` frames (the core
+ * applies nothing from them), and `reconnected` after the socket came back, when frames may have
+ * been missed.
+ */
+export type ExtensionRealtimeEvent =
+  | { type: `ext.${string}`; data: unknown; queryClient: QueryClient }
+  | { type: 'reconnected'; queryClient: QueryClient };
+
+export type ExtensionRealtimeListener = (event: ExtensionRealtimeEvent) => void;
+
+const extensionListeners = new Set<ExtensionRealtimeListener>();
+
+/** Registers an extension's listener; returns the function that removes it. */
+export function onExtensionRealtime(listener: ExtensionRealtimeListener): () => void {
+  extensionListeners.add(listener);
+  return () => {
+    extensionListeners.delete(listener);
+  };
+}
+
+/** Each listener in turn; one that throws does not stop the others (the error still surfaces). */
+function tellExtensions(event: ExtensionRealtimeEvent): void {
+  for (const listener of extensionListeners) {
+    try {
+      listener(event);
+    } catch (error) {
+      surface(error);
+    }
+  }
+}
+
+/** Extension frames are named `ext.<something>`; the core leaves them to the listeners. */
+const isExtensionType = (type: unknown): type is `ext.${string}` =>
+  typeof type === 'string' && type.startsWith('ext.') && type.length > 4;
+
 interface CallLike {
   id: string;
   userId: string;
@@ -171,6 +207,8 @@ function apply(queryClient: QueryClient, message: unknown): void {
     else void queryClient.invalidateQueries({ queryKey: walletKey });
   } else if (type === 'voicemail.created') {
     void queryClient.invalidateQueries({ queryKey: voicemailsKey });
+  } else if (isExtensionType(type)) {
+    tellExtensions({ type, data, queryClient });
   }
 }
 
@@ -220,6 +258,7 @@ export function startRealtime(options: StartRealtimeOptions): () => void {
         void queryClient.invalidateQueries({ queryKey: walletKey });
         void queryClient.invalidateQueries({ queryKey: voicemailsKey });
         refreshInbox(queryClient);
+        tellExtensions({ type: 'reconnected', queryClient });
       }
       everOpened = true;
       stopPing();

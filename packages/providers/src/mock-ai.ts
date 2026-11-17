@@ -35,4 +35,11 @@ export class MockAiProvider implements AiProvider {
       usage: { inputTokens: tokens(req.prompt.length), outputTokens: tokens(text.length) },
     };
   }
+
+  /** The same answer as `complete`, handed over a word at a time. */
+  async stream(req: AiRequest, onText: (delta: string) => void): Promise<AiResult> {
+    const result = await this.complete(req);
+    for (const piece of result.text.match(/\S+\s*/g) ?? []) onText(piece);
+    return result;
+  }
 }

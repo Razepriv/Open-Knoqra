@@ -15,7 +15,8 @@ export async function fillContactDialog(page: Page, contact: NewContact): Promis
   await dialog.getByLabel('Name').fill(contact.name);
   await dialog.getByLabel('Phone').fill(contact.phone);
   if (contact.company) await dialog.getByLabel('Company').fill(contact.company);
-  if (contact.email) await dialog.getByLabel('Email').fill(contact.email);
+  if (contact.email)
+    await dialog.getByRole('textbox', { name: 'Email', exact: true }).fill(contact.email);
   if (contact.timezone) await dialog.getByLabel('Time zone').selectOption(contact.timezone);
   if (contact.tags) await dialog.getByLabel('Tags').fill(contact.tags);
   await dialog.getByRole('button', { name: 'Add contact' }).click();

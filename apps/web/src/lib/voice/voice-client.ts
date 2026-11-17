@@ -34,6 +34,18 @@ export interface AnswerInput {
   clientState: string;
 }
 
+/**
+ * The live call's audio, for level meters: the microphone stream sent to the far side and the
+ * stream heard from it. Either is null until the call's media is up, or when the client has none
+ * (the fake client, or an SDK that does not expose it).
+ */
+export interface CallAudioStreams {
+  local: MediaStream | null;
+  remote: MediaStream | null;
+}
+
+export const NO_CALL_AUDIO: CallAudioStreams = { local: null, remote: null };
+
 /** One browser phone line. The server learns about call progress from provider events, not from here. */
 export interface VoiceClient {
   connect(cred: VoiceCredential): Promise<void>;
@@ -43,6 +55,8 @@ export interface VoiceClient {
   setMuted(muted: boolean): void;
   sendDigits(digits: string): void;
   disconnect(): void;
+  /** The live call's audio streams; optional, and all null when there is no live call. */
+  audioStreams?(): CallAudioStreams;
 }
 
 /** The slice of `navigator.mediaDevices.getUserMedia` the clients use. */

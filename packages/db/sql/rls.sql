@@ -3,7 +3,7 @@
 -- NULLIF: after a transaction-local set_config commits, the setting reverts to '' (not NULL) for
 -- the rest of the session, so '' must also match nothing (fail closed).
 DO $$ DECLARE t text; BEGIN
-  FOREACH t IN ARRAY ARRAY['contact','audit_event','contact_permission_event','timeline_event','contact_duplicate_dismissal','task','notification','otto_draft','usage_event','provider_credential','call','call_event','voicemail','wallet','ledger_entry','phone_number','provider_balance_snapshot','provider_usage_record','reconciliation_report','setup_progress','number_quote','number_order'] LOOP
+  FOREACH t IN ARRAY ARRAY['contact','audit_event','contact_permission_event','timeline_event','contact_duplicate_dismissal','task','notification','otto_draft','usage_event','provider_credential','call','call_event','voicemail','wallet','ledger_entry','phone_number','provider_balance_snapshot','provider_usage_record','reconciliation_report','setup_progress','number_quote','number_order','ai_credential'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS tenant_isolation ON %I', t);
@@ -148,6 +148,8 @@ BEGIN
   DELETE FROM provider_event_raw WHERE organization_id = org;
   DELETE FROM call_route WHERE organization_id = org;
   DELETE FROM provider_number_route WHERE organization_id = org;
+  -- Otto's model connection: the workspace's own OpenAI key or ChatGPT sign-in.
+  DELETE FROM ai_credential WHERE organization_id = org;
   IF NOT keep_provider_access THEN
     DELETE FROM provider_credential WHERE organization_id = org;
   END IF;

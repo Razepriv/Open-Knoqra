@@ -31,9 +31,12 @@ export interface Env {
    */
   BLOG_FEED_URL?: string;
   /**
-   * Otto's model (otto/provider.ts): unset or `mock` is the deterministic mock, `openai` an
-   * OpenAI-compatible API with AI_API_KEY, `chatgpt` each user's ChatGPT sign-in (not built yet:
-   * the mock until then). Anything else is not configured.
+   * The instance's own model for Otto (otto/provider.ts), used by workspaces that have not
+   * connected their own OpenAI key in Settings: `openai` is an OpenAI-compatible API with
+   * AI_API_KEY, `mock` the deterministic mock, `none` no instance model (each workspace connects
+   * its own). Unset means the mock in development and tests and `none` elsewhere. `chatgpt` (an
+   * older value) means `none`: ChatGPT sign-in is per workspace (OTTO_CHATGPT_SIGNIN). Anything
+   * else is not configured.
    */
   AI_PROVIDER?: string;
   /** Secret: the API key for `AI_PROVIDER=openai`. */
@@ -42,6 +45,16 @@ export interface Env {
   AI_MODEL?: string;
   /** Optional OpenAI-compatible base URL, for example `https://api.example.com/v1` (default OpenAI). */
   AI_BASE_URL?: string;
+  /**
+   * Feature flag: `on` offers "Sign in with ChatGPT" in Settings → Otto, so a workspace can use
+   * its own ChatGPT plan. OpenAI gives the client id to approved partners only (otto/chatgpt.ts);
+   * without OPENAI_SIWC_CLIENT_ID the flag does nothing.
+   */
+  OTTO_CHATGPT_SIGNIN?: string;
+  /** Var: the OAuth client id OpenAI issued for "Sign in with ChatGPT" (`oaiapp_...`). Public. */
+  OPENAI_SIWC_CLIENT_ID?: string;
+  /** Secret, optional: the client secret, if OpenAI issued one with the client id. */
+  OPENAI_SIWC_CLIENT_SECRET?: string;
   /**
    * Retired: live sending now follows each workspace's own registration status, read from its
    * provider (US texting registration for SMS, Meta's approval for WhatsApp). Ignored if set.

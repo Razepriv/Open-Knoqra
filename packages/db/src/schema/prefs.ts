@@ -24,6 +24,10 @@ export const userPrefs = pgTable(
     newsletter: boolean('newsletter').notNull().default(false),
     /** When the newsletter choice was last made (opt-in or opt-out), for consent records. */
     newsletterUpdatedAt: timestamp('newsletter_updated_at', { withTimezone: true }),
+    /** When the user accepted the Terms of Service and Privacy Policy, for consent records. */
+    termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+    /** Which version of the terms was accepted (the terms' "last updated" date). */
+    termsVersion: text('terms_version'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow()

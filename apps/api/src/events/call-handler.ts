@@ -117,4 +117,32 @@ export async function fanOutApplied(
   if (applied.voicemail) {
     await publish(env, orgId, { type: 'voicemail.created', data: applied.voicemail });
   }
+  await runAfterCallApplied(env, orgId, applied);
+}
+
+/** The editions' `afterCallApplied` hooks, one after another; an error is logged, never thrown. */
+async function runAfterCallApplied(
+  env: Env,
+  orgId: string,
+  applied: Extract<Applied, { kind: 'applied' }>,
+): Promise<void> {
+  for (const extension of env.EXTENSIONS ?? []) {
+    if (!extension.afterCallApplied) continue;
+    try {
+      await extension.afterCallApplied(env, {
+        orgId,
+        call: applied.call,
+        provider: applied.provider,
+        providerCallId: applied.providerCallId,
+        transition: applied.transition,
+        ended: applied.ended,
+      });
+    } catch (error) {
+      logger.error('call.after_applied_failed', {
+        extension: extension.name,
+        callId: applied.callId,
+        error,
+      });
+    }
+  }
 }
