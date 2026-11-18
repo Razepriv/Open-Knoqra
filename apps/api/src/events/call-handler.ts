@@ -139,6 +139,7 @@ async function runAfterCallApplied(
         providerCallId: applied.providerCallId,
         transition: applied.transition,
         ended: applied.ended,
+        voicemailId: applied.voicemail?.id ?? null,
       });
     } catch (error) {
       logger.error('call.after_applied_failed', {

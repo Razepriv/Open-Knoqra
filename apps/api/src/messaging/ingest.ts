@@ -25,6 +25,7 @@ import { and, asc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Env } from '../env';
 import { FOREIGN_CONNECTION, mayApplyTo } from '../events/connector-guard';
 import type { EventHandler, HandlerResult } from '../events/registry';
+import type { ReceivedMessageEvent } from '../extensions';
 import { findContact } from '../lib/contact-access';
 import { logger } from '../lib/logger';
 import { latestPermissionEvents } from '../lib/permissions';
@@ -57,11 +58,15 @@ const RECEIPT_STATUS: Partial<Record<ProviderEvent['type'], MessageStatus>> = {
 /** Nothing to run after commit. */
 const PROCESSED: HandlerResult = { status: 'processed', after: async () => undefined };
 
-/** What an applied event changed, for the after-commit step: messages to publish, files to fetch. */
+/**
+ * What an applied event changed, for the after-commit step: messages to publish, files to fetch,
+ * and the new inbound messages the editions hear about.
+ */
 interface Changes {
   messageIds: Set<string>;
   conversationIds: Set<string>;
   downloads: { attachment: MessageAttachment; businessNumber: string }[];
+  received: Omit<ReceivedMessageEvent, 'orgId'>[];
 }
 
 /**
@@ -92,7 +97,26 @@ function afterCommit(
     for (const conversationId of changes.conversationIds) {
       await publish(env, orgId, { type: 'conversation.updated', data: { conversationId } });
     }
+    for (const received of changes.received) {
+      await runAfterMessageReceived(env, { orgId, ...received });
+    }
   };
+}
+
+/** The editions' `afterMessageReceived` hooks, one after another; an error is logged, never thrown. */
+async function runAfterMessageReceived(env: Env, event: ReceivedMessageEvent): Promise<void> {
+  for (const extension of env.EXTENSIONS ?? []) {
+    if (!extension.afterMessageReceived) continue;
+    try {
+      await extension.afterMessageReceived(env, event);
+    } catch (error) {
+      logger.error('messaging.after_received_failed', {
+        extension: extension.name,
+        messageId: event.messageId,
+        error,
+      });
+    }
+  }
 }
 
 /**
@@ -125,7 +149,12 @@ export const handleMessageEvent: EventHandler<'message'> = async (ctx, normalize
       .returning({ id: providerEventRaw.id });
     if (claimed.length === 0) return PROCESSED;
 
-    const changes: Changes = { messageIds: new Set(), conversationIds: new Set(), downloads: [] };
+    const changes: Changes = {
+      messageIds: new Set(),
+      conversationIds: new Set(),
+      downloads: [],
+      received: [],
+    };
     const ctxIn: EventContext = { tx, orgId: route.orgId, rawEventId, event, payload, changes };
     if (received) await ingestInbound(ctxIn);
     else await ingestReceipt(ctxIn);
@@ -246,6 +275,12 @@ async function ingestInbound(ctx: EventContext): Promise<void> {
   });
   ctx.changes.messageIds.add(inserted.id);
   ctx.changes.conversationIds.add(conv.id);
+  ctx.changes.received.push({
+    conversationId: conv.id,
+    messageId: inserted.id,
+    contactId: conv.contactId,
+    channel: payload.channel,
+  });
 
   if (payload.media) {
     const [attachment] = await tx

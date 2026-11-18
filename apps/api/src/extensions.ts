@@ -1,5 +1,5 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import type { CallState } from '@knoqra/core';
+import type { CallState, MessagingChannel } from '@knoqra/core';
 import type { Database, Tx } from '@knoqra/db';
 import type { CronJob } from './cron/jobs';
 import type { NewsletterChange } from './email/newsletter';
@@ -37,6 +37,17 @@ export interface AppliedCallEvent {
   transition: { from: CallState; to: CallState } | null;
   /** True when this event ended the call. */
   ended: boolean;
+  /** The voicemail this event stored, or null. */
+  voicemailId: string | null;
+}
+
+/** A new inbound message, just stored and committed (messaging/ingest.ts). Ids only. */
+export interface ReceivedMessageEvent {
+  orgId: string;
+  conversationId: string;
+  messageId: string;
+  contactId: string;
+  channel: MessagingChannel;
 }
 
 /**
@@ -128,6 +139,12 @@ export interface ApiExtension {
    * effort: an error is logged and swallowed, and the event is not applied again.
    */
   afterCallApplied?: (env: Env, event: AppliedCallEvent) => Promise<void>;
+  /**
+   * Runs after a new inbound message is stored and committed (not a reaction, a duplicate delivery
+   * or a receipt), after the realtime fan-out, for example to notify phones. Best effort: an error
+   * is logged and swallowed.
+   */
+  afterMessageReceived?: (env: Env, event: ReceivedMessageEvent) => Promise<void>;
 }
 
 /**

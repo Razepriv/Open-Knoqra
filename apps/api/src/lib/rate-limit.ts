@@ -14,7 +14,7 @@ import { logger } from './logger';
  * counts per isolate only: these bindings are the limit that holds.
  */
 export interface RateLimitRule {
-  name: 'auth' | 'account_delete' | 'dial' | 'voice_token' | 'message_send';
+  name: 'auth' | 'account_delete' | 'dial' | 'voice_token' | 'message_send' | 'device_register';
   binding: (env: Env) => RateLimit | undefined;
   key: (c: Context<AppEnv>) => string;
 }
@@ -143,6 +143,13 @@ export const RULES: Record<RateLimitRule['name'], RateLimitRule> = {
     name: 'message_send',
     binding: (env) => env.RL_MESSAGE_SEND,
     key: (c) => `send:${c.var.tenant.orgId}`,
+  },
+  // A phone registering for push (an edition's device route): per user, on the voice token's
+  // binding (20 a minute) under its own key.
+  device_register: {
+    name: 'device_register',
+    binding: (env) => env.RL_VOICE_TOKEN,
+    key: (c) => `device:${c.var.tenant.userId}`,
   },
 };
 
