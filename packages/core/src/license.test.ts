@@ -3,6 +3,7 @@ import {
   base64UrlDecode,
   base64UrlEncode,
   encodeLicense,
+  importLicensePublicKey,
   importLicenseSigningKey,
   LICENSE_PREFIX,
   type LicensePayload,
@@ -178,9 +179,9 @@ describe('license keys', () => {
     }
   });
 
-  it('the embedded public key is empty or a 32-byte key', () => {
-    const decoded = Buffer.from(LICENSE_PUBLIC_KEY, 'base64');
-    expect(LICENSE_PUBLIC_KEY === '' || decoded.length === 32).toBe(true);
+  it('the embedded public key is a 32-byte Ed25519 key that imports', async () => {
+    expect(Buffer.from(LICENSE_PUBLIC_KEY, 'base64').length).toBe(32);
+    expect(await importLicensePublicKey(LICENSE_PUBLIC_KEY)).not.toBeNull();
   });
 });
 
