@@ -18,13 +18,13 @@
     "@knoqra/core": "workspace:*",
     "@knoqra/db": "workspace:*",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.18",
+    "hono": "^4.13.19",
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261110.1",
+    "@cloudflare/workers-types": "^5.20261120.1",
     "@knoqra/config": "workspace:*",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.23.1",
     "lighthouse": "^13.6.0",
